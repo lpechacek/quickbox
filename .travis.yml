@@ -28,7 +28,7 @@ env:
   global:
    # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
    #   via the "travis encrypt" command using the project repo's public key
-   - secure: "NpfoX8Y7CKBHVHB+s5vVcCB4lrpG9CnnOO3NBalNGOhr9mYJPJjuo5zjV1ZVHViUNvYD9BZ2Ra+mrJ5vCy3QsEPg1VnkbWgillhwZwkXJ3qWXkTghYC0IVSHcaOez8B4DsEU4kDVTXhR9mbLXritgOTp83W69fbRgmFfv2qpK/PUiFJB6KbA8Tq51d/0ZJyrLgDOxPFlwMtLbxfyu8qi/ir7QgHMFHwq/pcgzpB8R5RENjeXnfAVPezl5ABzOVvJ99156N2EFarMAILYaD2B7uNcAlYWuGBjX/al58m3V05NKD6gjgVeaGCIYkUQ7rkOZondGMWDGLng0OpUm3yJLVrLDaku/ippWesp9QbPXOdDxAdvpv2hraNRIU1hEsYiY48pnh4zQGaMrqAT15ag2vDVKg3IDobUmRRSsMqIEZ8oUmUbRGOKsQYIzVVin1zI0t6wmzmxdpEc/Y2lgrTxGS5yWWQ3SS7862zubx0SlDu12vNxesA/8f5KpQDtvlU11XYBNyVpzLi8YL50vWF55D1fegI4AfPr5eZL76sIilUyiFQ4vL+8XkmiEOEfh2BuXwe2UumsL+eLNeXITX5zOSj3MKIOq9rkx3ZoEw/BssIaAJpYVxAdBviE1QBa7imQZW/46+D3NQr9o7NHJZgsDso5Unpv1X+SVMRdQEzE1uw="
+   - secure: "mHOiA+PqwPJ5CWE4IYUpsEHJao7Ra+jD31O0JSqyONHiRevr0PoxIhHK06TubhY2Ih8A92srZCBnTl79cm5OnoOyxeDU8vJHBK0gmQwbUUJrE9W5jsY/YzfD3UEnr8HU2A4Yd32bPmGwURWs6VFiJhVwIq/Xd7bMHLAYofZqJutp5JofpAhy7/zr8D8Ryr5NZN8nFAPpZo8HwgyYcEaBMwCLykMCLfUAcBZxSXUhHzBQ5WpTLlsSnHa+0lstHxiSUxyHUMITFIb9ILjaAT1gVDr+NiDro6Girxqoj2Rgsx/rBKuzabXQKJRywdbvsyvmYsNwB0q1mID+92tuFeb6DHiBIreEEsq5Le0TfeyTCLByDc4ZvAeRY4KPJZs2j2KHqBltmHZZsPbbfUjr+7ooL3FYjw34pm3WSgQMfXL2e5pxNy9nDS68+KKmdgdlvHf/MLg9BsHVPlgdHJHV8Y88vPMb9/OVBQBjGYq2y3KwZAJITSmV2rwrly8JulwyIoa8RtLPvSYacO67iT1/2zYSGmTgM1hmyy4CNOWgT0vKpqGsk45uZmDwHTaTd1BInWOcl3Sqbi7HnRQ8smExfsUs9tdY2dxT6xiBv/TRfZPwiEFhZxKeGEWyytpkR5gCfF6dIM37yp5Hsx6YSPE4+/VN7Ejs+oNWuA8cDHpAMgT43lw="
 
 addons:
   coverity_scan:
@@ -37,5 +37,5 @@ addons:
       description: "QuickBox build through Travis CI"
     notification_email: lpechacek@suse.cz
     build_command_prepend: "source /opt/qt55/bin/qt55-env.sh; qmake -r"
-    build_command:   "make"
+    build_command:   "make -j4"
     branch_pattern: coverity_scan
