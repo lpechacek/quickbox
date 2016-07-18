@@ -45,11 +45,49 @@ namespace qfs = qf::core::sql;
 
 namespace Event {
 
+class DbEventPayload : public QVariantMap
+{
+private:
+	typedef QVariantMap Super;
+
+	QF_VARIANTMAP_FIELD(QString, e, setE, ventName)
+	QF_VARIANTMAP_FIELD(QString, d, setD, omain)
+	QF_VARIANTMAP_FIELD(int, c, setc, onnectionId)
+	QF_VARIANTMAP_FIELD(QVariant, d, setD, ata)
+public:
+	DbEventPayload(const QVariantMap &data = QVariantMap()) : QVariantMap(data) {}
+
+	static DbEventPayload fromJson(const QByteArray &json);
+
+	QByteArray toJson() const;
+};
+
+DbEventPayload DbEventPayload::fromJson(const QByteArray &json)
+{
+	QJsonParseError error;
+	QJsonDocument jsd = QJsonDocument::fromJson(json, &error);
+	if(error.error == QJsonParseError::NoError) {
+		QVariantMap m = jsd.toVariant().toMap();
+		return DbEventPayload(m);
+	}
+	else {
+		qfError() << "JSON parse error:" << error.errorString();
+	}
+	return DbEventPayload();
+}
+
+QByteArray DbEventPayload::toJson() const
+{
+	QJsonDocument jsd = QJsonDocument::fromVariant(*this);
+	return jsd.toJson(QJsonDocument::Compact);
+}
+
 static auto QBE_EXT = QStringLiteral(".qbe");
 
 const char* EventPlugin::DBEVENT_COMPETITOR_COUNTS_CHANGED = "competitorCountsChanged";
 const char* EventPlugin::DBEVENT_CARD_READ = "cardRead";
 const char* EventPlugin::DBEVENT_PUNCH_RECEIVED = "punchReceived";
+const char* EventPlugin::DBEVENT_REGISTRATIONS_IMPORTED = "registrationsImported";
 
 static QString eventNameToFileName(const QString &event_name)
 {
@@ -128,7 +166,7 @@ int EventPlugin::currentStageId()
 	return m_cbxStage->currentIndex() + 1;
 }
 
-int EventPlugin::stageStart(int stage_id)
+int EventPlugin::stageStartMsec(int stage_id)
 {
 	QTime start_time = stageStartTime(stage_id);
 	int ret = start_time.msecsSinceStartOfDay();
@@ -151,12 +189,7 @@ QDateTime EventPlugin::stageStartDateTime(int stage_id)
 	QDateTime dt = stage_data.startDateTime();
 	return dt;
 }
-/*
-int EventPlugin::currentStageStartMsec()
-{
-	return stageStart(currentStageId());
-}
-*/
+
 StageData EventPlugin::stageData(int stage_id)
 {
 	QVariantMap ret;
@@ -301,25 +334,35 @@ void EventPlugin::editStage()
 	}
 }
 
-void EventPlugin::emitDbEvent(const QString &domain, const QVariant &payload, bool loopback)
+void EventPlugin::emitDbEvent(const QString &domain, const QVariant &data, bool loopback)
 {
-	qfLogFuncFrame() << "domain:" << domain << "payload:" << payload;
+	qfLogFuncFrame() << "domain:" << domain << "payload:" << data;
+	int connection_id = qf::core::sql::Connection::defaultConnection().connectionId();
 	if(loopback) {
 		// emit queued
 		//emit dbEventNotify(domain, payload);
 		QMetaObject::invokeMethod(this, "dbEventNotify", Qt::QueuedConnection,
 								  Q_ARG(QString, domain),
-								  Q_ARG(QVariant, payload));
+								  Q_ARG(int, connection_id),
+								  Q_ARG(QVariant, data));
 	}
 	if(connectionType() == ConnectionType::SingleFile)
 		return;
-	//QVariantMap m;
-	QJsonObject jso;
-	jso[QLatin1String("event")] = eventName();
-	jso[QLatin1String("domain")] = domain;
-	jso[QLatin1String("payload")] = QJsonValue::fromVariant(payload);
-	QJsonDocument jsd(jso);
-	QString payload_str = QString::fromUtf8(jsd.toJson(QJsonDocument::Compact));
+	DbEventPayload dbpl;
+	dbpl.setEventName(eventName());
+	dbpl.setDomain(domain);
+	dbpl.setData(data);
+	dbpl.setconnectionId(connection_id);
+	QByteArray json_ba = dbpl.toJson();
+	QString payload_str = QString::fromUtf8(json_ba);
+	if(payload_str.length() > 4000) {
+		int len = payload_str.toUtf8().length();
+		if(len > 8000) {
+			qfInfo() << payload_str;
+			qfError() << "Payload of size" << len << "is too long. Max Postgres payload length is 8000 bytes.";
+			return;
+		}
+	}
 	payload_str = qf::core::sql::Connection::escapeJsonForSql(payload_str);
 	qf::core::sql::Connection conn = qf::core::sql::Connection::forName();
 	QString qs = QString("NOTIFY ") + DBEVENT_NOTIFY_NAME + ", '" + payload_str + "'";
@@ -363,22 +406,21 @@ void EventPlugin::onDbEvent(const QString &name, QSqlDriver::NotificationSource 
 	qfLogFuncFrame() << "name:" << name << "source:" << source << "payload:" << payload;
 	if(name == QLatin1String(DBEVENT_NOTIFY_NAME)) {
 		if(source == QSqlDriver::OtherSource) {
-			QJsonDocument jsd = QJsonDocument::fromJson(payload.toString().toUtf8());
-			QVariantMap m = jsd.toVariant().toMap();
-			QString domain = m.value(QStringLiteral("domain")).toString();
+			DbEventPayload dbpl = DbEventPayload::fromJson(payload.toString().toUtf8());
+			QString domain = dbpl.domain();
 			if(domain.isEmpty()) {
 				qfWarning() << "DbNotify with invalid domain, payload:" << payload.toString();
 				return;
 			}
-			QString event_name = m.value(QStringLiteral("event")).toString();
+			QString event_name = dbpl.eventName();
 			if(event_name.isEmpty()) {
-				qfWarning() << "DbNotify with invalid event name, payload:" << payload.toString();
+				qfWarning() << "DbNotify with invalid event name, payload:" << event_name << payload.toString();
 				return;
 			}
 			if(event_name == eventName()) {
-				QVariant pl = m.value(QStringLiteral("payload"));
-				qfDebug() << "emitting domain:" << domain << "payload:" << pl;
-				emit dbEventNotify(domain, pl);
+				QVariant data = dbpl.data();
+				qfDebug() << "emitting domain:" << domain << "data:" << data;
+				emit dbEventNotify(domain, dbpl.connectionId(), data);
 			}
 		}
 		else {
@@ -696,7 +738,7 @@ bool EventPlugin::closeEvent()
 	m_classNameCache.clear();
 	setEventName(QString());
 	QF_SAFE_DELETE(m_eventConfig);
-	emit eventOpened(eventName()); //comment it till QE can load event with invalid name
+	//emit eventOpened(eventName()); //comment it till QE can load event with invalid name
 	return true;
 }
 

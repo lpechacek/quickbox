@@ -40,13 +40,14 @@ QtObject {
 		tt.setData(reportModel.toTreeTableData());
 		tt.setValue("stageId", stage_id)
 		tt.setValue("event", event_plugin.eventConfig.value("event"));
+		tt.setValue("stageStart", event_plugin.stageStartDateTime(stage_id));
 
 		reportModel.queryBuilder.clear()
 			.select2('competitors', 'lastName, firstName, registration')
 			.select("COALESCE(competitors.lastName, '') || ' ' || COALESCE(competitors.firstName, '') AS competitorName")
 			.select2('runs', 'siId, startTimeMs')
 			.from('competitors')
-			.joinRestricted("competitors.id", "runs.competitorId", "runs.stageId={{stage_id}}")
+			.joinRestricted("competitors.id", "runs.competitorId", "runs.stageId={{stage_id}} AND NOT runs.offrace", "INNER JOIN")
 			.where("competitors.classId={{class_id}}")
 			.orderBy('runs.startTimeMs');
 		for(var i=0; i<tt.rowCount(); i++) {
@@ -107,6 +108,7 @@ QtObject {
 		tt.setData(reportModel.toTreeTableData());
 		tt.setValue("stageId", stage_id)
 		tt.setValue("event", event_plugin.eventConfig.value("event"));
+		tt.setValue("stageStart", event_plugin.stageStartDateTime(stage_id));
 		tt.column(0).type = "QString"; // sqlite returns clubAbbr column as QVariant::Invalid, set correct type
 		//console.info(tt.toString());
 
@@ -116,7 +118,7 @@ QtObject {
 			.select2('classes', 'name')
 			.select2('runs', 'siId, startTimeMs')
 			.from('competitors')
-			.joinRestricted("competitors.id", "runs.competitorId", "runs.stageId={{stage_id}}")
+			.joinRestricted("competitors.id", "runs.competitorId", "runs.stageId={{stage_id}} AND NOT runs.offrace", "INNER JOIN")
 			.join("competitors.classId", "classes.id")
 			.where("COALESCE(substr(competitors.registration, 1, 3), '')='{{club_abbr}}'")
 			.orderBy('classes.name, runs.startTimeMs');
@@ -146,7 +148,7 @@ QtObject {
 			.select2('runs', 'siId, startTimeMs')
 			.select2('classes', 'name')
 			.from('competitors')
-			.joinRestricted("competitors.id", "runs.competitorId", "runs.stageId={{stageId}}")
+			.joinRestricted("competitors.id", "runs.competitorId", "runs.stageId={{stageId}} AND NOT runs.offrace", "INNER JOIN")
 			.join("competitors.classId", "classes.id")
 			.orderBy('runs.startTimeMs, classes.name, competitors.lastName')//.limit(50);
 		if(class_group === 'H') {
@@ -258,7 +260,7 @@ QtObject {
 		//dlg.dialogType = RunsPlugin.StartListReport;
 		//var mask = InputDialogSingleton.getText(this, qsTr("Get text"), qsTr("Class mask (use wild cards [*?]):"), "*");
 		if(dlg.exec()) {
-			var tt = startListClassesTable(dlg.sqlWhereExpression(), true);
+			var tt = startListClassesTable(dlg.sqlWhereExpression(), false);
 			QmlWidgetsSingleton.showReport(runsPlugin.manifest.homeDir + "/reports/startList_classes.qml"
 										   , tt.data()
 										   , qsTr("Start list by clases")
@@ -341,7 +343,7 @@ QtObject {
 	{
 		var default_file_name = "startlist-classes.html";
 
-		var tt1 = startListClassesTable("", true);
+		var tt1 = startListClassesTable("", false);
 		var body = ['body']
 		var h1_str = "{{documentTitle}}";
 		var event = tt1.value("event");
@@ -350,7 +352,7 @@ QtObject {
 		body.push(['h1', h1_str]);
 		body.push(['h2', event.name]);
 		body.push(['h3', event.place]);
-		body.push(['h3', event.date]);
+		body.push(['h3', tt1.value("stageStart")]);
 		var div1 = ['div'];
 		body.push(div1);
 		for(var i=0; i<tt1.rowCount(); i++) {
@@ -395,7 +397,6 @@ QtObject {
 	function exportStartListIofXml3(file_path)
 	{
 		var event_plugin = FrameWork.plugin("Event");
-		//var start00_msec = event_plugin.stageStart(runsPlugin.selectedStageId);
 		var start00_datetime = event_plugin.stageStartDateTime(runsPlugin.selectedStageId);
 		//console.info("start00_datetime:", start00_datetime, typeof start00_datetime)
 		var start00_epoch_sec = start00_datetime.getTime();
@@ -469,7 +470,7 @@ QtObject {
 		body.push(['h1', h1_str]);
 		body.push(['h2', event.name]);
 		body.push(['h3', event.place]);
-		body.push(['h3', event.date]);
+		body.push(['h3', tt1.value("stageStart")]);
 		var div1 = ['div'];
 		body.push(div1);
 		for(var i=0; i<tt1.rowCount(); i++) {

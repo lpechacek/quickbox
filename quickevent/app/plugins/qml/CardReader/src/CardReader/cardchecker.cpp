@@ -6,6 +6,7 @@
 #include <Runs/runsplugin.h>
 
 #include <quickevent/og/timems.h>
+#include <quickevent/si/punchrecord.h>
 
 #include <siut/simessage.h>
 
@@ -55,7 +56,7 @@ int CardChecker::stageStartSec()
 	qf::qmlwidgets::framework::MainWindow *fwk = qf::qmlwidgets::framework::MainWindow::frameWork();
 	auto event_plugin = qobject_cast<Event::EventPlugin *>(fwk->plugin("Event"));
 	QF_ASSERT(event_plugin != nullptr, "Bad plugin", return 0);
-	int ret = event_plugin->stageStart(event_plugin->currentStageId());
+	int ret = event_plugin->stageStartMsec(event_plugin->currentStageId());
 	return ret / 1000;
 }
 
@@ -123,6 +124,6 @@ QVariantMap CardChecker::courseCodesForRunId(int run_id)
 
 int CardChecker::finishPunchCode()
 {
-	return CardReader::CardReaderPlugin::FINISH_PUNCH_CODE;
+	return quickevent::si::PunchRecord::FINISH_PUNCH_CODE;
 }
 

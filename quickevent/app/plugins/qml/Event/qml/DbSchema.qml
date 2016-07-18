@@ -172,7 +172,7 @@ Schema {
 					comment: 'in miliseconds'
 				},
 				Field { name: 'timeMs'; type: Int {}
-					comment: 'in miliseconds'
+					comment: 'in miliseconds since event start'
 				},
 				Field { name: 'offRace'; type: Boolean { }
 					defaultValue: false;
@@ -326,12 +326,17 @@ Schema {
 					}
 					comment: 'JSON of format [[code, time, msec, day_of_week, week_cnt], ...]}'
 				},
+				Field { name: 'readerConnectionId'
+					type: Int { }
+					comment: 'connection id of QuickEvent instance which has read this card'
+				},
 				Field { name: 'printerConnectionId'
 					type: Int { }
 					comment: 'connection id of QuickEvent instance which has printed this strip'
 				}
   			]
 			indexes: [
+				Index { fields: ['readerConnectionId']; unique: false },
 				Index { fields: ['printerConnectionId']; unique: false },
 				Index { fields: ['stageId', 'siId']; unique: false },
 				Index { fields: ['runId']; unique: false }
@@ -342,21 +347,30 @@ Schema {
 				Field { name: 'id'; type: Serial { primaryKey: true } },
 				Field { name: 'code'; type: Int { } },
 				Field { name: 'siId'; type: Int {} },
-				Field { name: 'punchTime'; type: Int {}
+				Field { name: 'time'; type: Int {}
 					comment: 'seconds in range 0 - 12 hours'
 				},
-				Field { name: 'punchMs'; type: Int {}
+				Field { name: 'msec'; type: Int {}
 					comment: 'msec part od punch time'
 				},
 				Field { name: 'stageId'; type: Int { }
 					comment: 'We cannot take stageId from runId linked table, because we need select punches for stage even without runId assigned'
 				},
 				Field { name: 'runId'; type: Int {} },
-				Field { name: 'punchTimeMs'; type: Int {}
-					comment: 'in miliseconds'
+				Field { name: 'timeMs'; type: Int {}
+					comment: 'in miliseconds since event start'
+				},
+				Field { name: 'runTimeMs'; type: Int {}
+					comment: 'in miliseconds since runner event start'
+				},
+				Field { name: 'marking'; type: String {}
+					notNull: true
+					defaultValue: 'race';
+					comment: 'possible values: race | entries'
 				}
 			]
 			indexes: [
+				Index {fields: ['marking', 'stageId', 'code']; unique: false },
 				Index {fields: ['runId']; unique: false }
 			]
 		}
@@ -365,11 +379,10 @@ Schema {
 		/*
 		Insert {
 			table: enumz
-			fields: ['groupName', 'groupId', 'pos']
+			fields: ['groupName', 'groupId', 'pos', 'caption']
 			rows: [
-				['runs.status', 'OFF', 1],
-				['runs.status', 'START', 2],
-				['runs.status', 'FINISH', 3]
+				['cardReader.punchMarking', 'race', 1, qsTr('Race')],
+				['cardReader.punchMarking', 'entries', 2, qsTr('Entries')]
 			]
 		},
 		*/

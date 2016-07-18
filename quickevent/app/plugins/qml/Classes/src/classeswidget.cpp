@@ -4,6 +4,7 @@
 #include "Classes/classesplugin.h"
 #include "editcodeswidget.h"
 #include "editcourseswidget.h"
+#include "drawing/drawingganttwidget.h"
 
 #include <Event/eventplugin.h>
 
@@ -152,6 +153,7 @@ ClassesWidget::ClassesWidget(QWidget *parent) :
 		m->addColumn("codes.code", tr("Code")).setReadOnly(true);
 		m->addColumn("codes.altCode", tr("Alt")).setToolTip(tr("Code alternative")).setReadOnly(false);
 		m->addColumn("codes.outOfOrder", tr("O")).setToolTip(tr("Out of order"));
+		m->addColumn("codes.radio", tr("R")).setToolTip(tr("Radio"));
 		ui->tblCourseCodes->setTableModel(m);
 		m_courseCodesModel = m;
 	}
@@ -175,13 +177,6 @@ void ClassesWidget::settleDownInPartWidget(ThisPartWidget *part_widget)
 
 	qfw::Action *a_edit = part_widget->menuBar()->actionForPath("edit", true);
 	a_edit->setText("&Edit");
-	/*
-	{
-		qfw::Action *a = new qfw::Action("&Classes", this);
-		//connect(a, &QAction::triggered, this, &ClassesWidget::edit_codes);
-		a_edit->addActionInto(a);
-	}
-	*/
 	{
 		qfw::Action *a = new qfw::Action("Cou&rses", this);
 		connect(a, &QAction::triggered, this, &ClassesWidget::edit_courses);
@@ -191,6 +186,20 @@ void ClassesWidget::settleDownInPartWidget(ThisPartWidget *part_widget)
 		qfw::Action *a = new qfw::Action("Co&des", this);
 		connect(a, &QAction::triggered, this, &ClassesWidget::edit_codes);
 		a_edit->addActionInto(a);
+	}
+	{
+		qfw::Action *a = new qfw::Action("Classes &layout");
+		a->setShortcut("Ctrl+L");
+		a_edit->addActionInto(a);
+		connect(a, &qfw::Action::triggered, [this]()
+		{
+			auto *w = new drawing::DrawingGanttWidget;
+			qf::qmlwidgets::dialogs::Dialog dlg(this);
+			//dlg.setButtons(QDialogButtonBox::Save);
+			dlg.setCentralWidget(w);
+			w->load(selectedStageId());
+			dlg.exec();
+		});
 	}
 
 	qfw::Action *a_import = part_widget->menuBar()->actionForPath("import", true);
@@ -210,6 +219,7 @@ void ClassesWidget::settleDownInPartWidget(ThisPartWidget *part_widget)
 		connect(a, &QAction::triggered, this, &ClassesWidget::import_ocad_iofxml_3);
 		a_import->addActionInto(a);
 	}
+
 	qfw::ToolBar *main_tb = part_widget->toolBar("main", true);
 	//main_tb->addAction(m_actCommOpen);
 	{
@@ -290,7 +300,7 @@ void ClassesWidget::reload()
 	}
 	{
 		qf::core::sql::Query q(m_classesModel->sqlConnection());
-		q.exec("SELECT COUNT(*) FROM classdefs WHERE stageId=" QF_IARG(stage_id));
+		q.exec("SELECT COUNT(*) FROM courses");
 		bool ro = true;
 		if(q.next())
 			ro = (q.value(0).toInt() == 0);
@@ -469,7 +479,7 @@ static QString dump_element(const QDomElement &el)
 void ClassesWidget::import_ocad_iofxml_2()
 {
 	qfLogFuncFrame();
-	QString fn = qfd::FileDialog::getOpenFileName(this, tr("Open file"), QString(), "XML files (*.xml);; All files (*)");
+	QString fn = qfd::FileDialog::getOpenFileName(this, tr("Open file"), QString(), tr("XML files (*.xml);; All files (*)"));
 	if(fn.isEmpty())
 		return;
 	try {

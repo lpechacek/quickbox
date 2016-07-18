@@ -12,18 +12,19 @@ GanttScene::GanttScene(QObject * parent)
 
 }
 
-void GanttScene::load()
+void GanttScene::load(int stage_id)
 {
 	clear();
 	m_ganttItem = new GanttItem();
 	addItem(m_ganttItem);
-	m_ganttItem->load();
+	m_ganttItem->load(stage_id);
+	m_stageId = stage_id;
 }
 
 void GanttScene::save()
 {
 	if(m_ganttItem)
-		m_ganttItem->save();
+		m_ganttItem->save(m_stageId);
 }
 
 int GanttScene::duToMin(int n) const

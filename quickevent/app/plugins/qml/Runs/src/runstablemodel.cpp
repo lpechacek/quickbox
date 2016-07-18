@@ -1,7 +1,7 @@
 #include "runstablemodel.h"
 
 #include <quickevent/og/timems.h>
-#include <quickevent/og/siid.h>
+#include <quickevent/si/siid.h>
 
 #include <qf/core/sql/connection.h>
 #include <qf/core/sql/transaction.h>
@@ -19,14 +19,14 @@ RunsTableModel::RunsTableModel(QObject *parent)
 	setColumn(col_competitors_siId, ColumnDefinition("competitors.siId", tr("SI")));
 	setColumn(col_competitorName, ColumnDefinition("competitorName", tr("Name")));
 	setColumn(col_registration, ColumnDefinition("registration", tr("Reg")));
-	setColumn(col_runs_siId, ColumnDefinition("runs.siId", tr("SI")).setCastType(qMetaTypeId<quickevent::og::SiId>()));
+	setColumn(col_runs_siId, ColumnDefinition("runs.siId", tr("SI")).setCastType(qMetaTypeId<quickevent::si::SiId>()));
 	setColumn(col_runs_startTimeMs, ColumnDefinition("runs.startTimeMs", tr("Start")).setCastType(qMetaTypeId<quickevent::og::TimeMs>()));
 	setColumn(col_runs_timeMs, ColumnDefinition("runs.timeMs", tr("Time")).setCastType(qMetaTypeId<quickevent::og::TimeMs>()));
 	setColumn(col_runs_finishTimeMs, ColumnDefinition("runs.finishTimeMs", tr("Finish")).setCastType(qMetaTypeId<quickevent::og::TimeMs>()));
 	setColumn(col_runs_notCompeting, ColumnDefinition("runs.notCompeting", tr("NC")).setToolTip(tr("Not competing")));
 	setColumn(col_runs_cardLent, ColumnDefinition("runs.cardLent", tr("L")).setToolTip(tr("Card lent")));
 	setColumn(col_runs_cardReturned, ColumnDefinition("runs.cardReturned", tr("R")).setToolTip(tr("Card returned")));
-	setColumn(col_runs_misPunch, ColumnDefinition("runs.misPunch", tr("Error")).setToolTip(tr("Card mispunch")).setReadOnly(true));
+	setColumn(col_disqReason, ColumnDefinition("disqReason", tr("Error")).setToolTip(tr("Disqualification reason")).setReadOnly(true));
 	setColumn(col_runs_disqualified, ColumnDefinition("runs.disqualified", tr("DISQ")).setToolTip(tr("Disqualified")));
 	setColumn(col_competitors_note, ColumnDefinition("competitors.note", tr("Note")));
 
@@ -53,18 +53,20 @@ Qt::ItemFlags RunsTableModel::flags(const QModelIndex &index) const
 
 QVariant RunsTableModel::value(int row_ix, int column_ix) const
 {
-	/*
-	ColumnDefinition cd = columnDefinition(column_ix);
-	if(cd.matchesSqlId(QStringLiteral("virtual.finishTimeMs"))) {
-		QVariant ret;
-		QVariant start_ms = value(row_ix, "startTimeMs");
-		QVariant time_ms = value(row_ix, "timeMs");
-		if(!start_ms.isNull() && !time_ms.isNull()) {
-			ret = start_ms.toInt() + time_ms.toInt();
-		}
-		return ret;
+	if(column_ix == col_disqReason) {
+		qf::core::utils::TableRow row = tableRow(row_ix);
+		bool mis_punch = row.value(QStringLiteral("runs.misPunch")).toBool();
+		bool bad_check = row.value(QStringLiteral("runs.badCheck")).toBool();
+		QStringList sl;
+		if(mis_punch)
+			sl << tr("MisPunch");
+		if(bad_check)
+			sl << tr("BadCheck");
+		if(sl.isEmpty())
+			return QStringLiteral(" ");
+		else
+			return sl.join(',');
 	}
-	*/
 	return Super::value(row_ix, column_ix);
 }
 
@@ -79,6 +81,9 @@ bool RunsTableModel::setValue(int row_ix, int column_ix, const QVariant &val)
 			if(time_ms > 0) {
 				Super::setValue(row_ix, "timeMs", time_ms);
 			}
+			else {
+				Super::setValue(row_ix, "timeMs", QVariant());
+			}
 		}
 	}
 	else if(cd.matchesSqlId(QStringLiteral("timeMs"))) {
@@ -87,6 +92,9 @@ bool RunsTableModel::setValue(int row_ix, int column_ix, const QVariant &val)
 			int finish_ms = val.toInt() + start_ms.toInt();
 			if(finish_ms > 0) {
 				Super::setValue(row_ix, columnIndex("finishTimeMs"), finish_ms);
+			}
+			else {
+				Super::setValue(row_ix, "timeMs", QVariant());
 			}
 		}
 	}

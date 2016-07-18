@@ -256,9 +256,9 @@ void OrisImporter::importEventOrisEntries(int event_id)
 				doc_lst << doc;
 				doc->setSaveSiidToRuns(false);
 				int import_id = competitor_o.value(QStringLiteral("ID")).toString().toInt();
-				int id = imported_competitors.value(import_id);
-				if(id > 0) {
-					doc->load(id);
+				int competitor_id = imported_competitors.value(import_id);
+				if(competitor_id > 0) {
+					doc->load(competitor_id);
 					imported_competitors.remove(import_id);
 				}
 				else {
@@ -516,7 +516,7 @@ void OrisImporter::importRegistrations()
 			transaction.commit();
 			fwk->hideProgress();
 			QMetaObject::invokeMethod(fwk->plugin("Event"), "emitDbEvent", Qt::QueuedConnection
-									  , Q_ARG(QString, "Oris.registrationImported")
+									  , Q_ARG(QString, Event::EventPlugin::DBEVENT_REGISTRATIONS_IMPORTED)
 									  , Q_ARG(QVariant, QVariant())
 									  , Q_ARG(bool, true)
 									  );

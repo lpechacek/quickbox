@@ -10,6 +10,7 @@
 #include <quickevent/og/itemdelegate.h>
 #include <quickevent/og/sqltablemodel.h>
 #include <quickevent/og/timems.h>
+#include <quickevent/si/siid.h>
 
 #include <qf/qmlwidgets/dialogs/dialog.h>
 #include <qf/qmlwidgets/dialogs/messagebox.h>
@@ -27,6 +28,8 @@
 
 namespace qfd = qf::qmlwidgets::dialogs;
 namespace qfw = qf::qmlwidgets;
+namespace qfc = qf::core;
+namespace qfs = qf::core::sql;
 /*
 static Competitors::CompetitorsPlugin* competitorsPlugin()
 {
@@ -70,7 +73,7 @@ CompetitorWidget::CompetitorWidget(QWidget *parent) :
 	m_runsModel = new quickevent::og::SqlTableModel(this);
 	m_runsModel->addColumn("runs.offRace", tr("Off", "runs.offRace")).setToolTip(tr("Off race in this stage"));
 	m_runsModel->addColumn("runs.stageId", tr("Stage")).setReadOnly(true);
-	m_runsModel->addColumn("runs.siid", tr("SI")).setReadOnly(false).setCastType(qMetaTypeId<quickevent::og::SiId>());
+	m_runsModel->addColumn("runs.siid", tr("SI")).setReadOnly(false).setCastType(qMetaTypeId<quickevent::si::SiId>());
 	m_runsModel->addColumn("runs.startTimeMs", tr("Start")).setCastType(qMetaTypeId<quickevent::og::TimeMs>());
 	m_runsModel->addColumn("runs.timeMs", tr("Time"))
 			.setCastType(qMetaTypeId<quickevent::og::TimeMs>());
@@ -223,6 +226,20 @@ void CompetitorWidget::onRegistrationSelected(const QVariantMap &values)
 				}
 			}
 		}
+	}
+}
+
+void CompetitorWidget::loadFromRegistrations(int siid)
+{
+	qfs::Query q;
+	q.exec("SELECT * FROM registrations WHERE siId=" + QString::number(siid), qfc::Exception::Throw);
+	if(q.next()) {
+		QVariantMap vals = q.values();
+		onRegistrationSelected(vals);
+	}
+	else {
+		qf::core::model::DataDocument*doc = dataController()->document();
+		doc->setValue(QStringLiteral("competitors.siid"), siid);
 	}
 }
 

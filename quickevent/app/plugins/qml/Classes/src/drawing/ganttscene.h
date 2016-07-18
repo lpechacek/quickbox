@@ -15,7 +15,7 @@ private:
 public:
 	GanttScene(QObject * parent = 0);
 
-	void load();
+	void load(int stage_id);
 	void save();
 
 	/**
@@ -30,6 +30,7 @@ public:
 	int duToMin(int n) const;
 
 private:
+	int m_stageId = -1;
 	int m_displayUnit;
 	GanttItem *m_ganttItem;
 };
