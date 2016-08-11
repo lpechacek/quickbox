@@ -398,7 +398,7 @@ DbSchema EventPlugin::dbSchema()
 
 int EventPlugin::minDbVersion()
 {
-	return 10005;
+	return 10100;
 }
 
 void EventPlugin::onDbEvent(const QString &name, QSqlDriver::NotificationSource source, const QVariant &payload)
@@ -671,7 +671,7 @@ bool EventPlugin::createEvent(const QString &event_name, const QVariantMap &even
 								  Q_ARG(QVariant, create_options));
 		QStringList create_script = ret_val.toStringList();
 
-		qfInfo().nospace() << create_script.join(";\n") << ';';
+		qfInfo().nospace().noquote() << create_script.join(";\n") << ';';
 		qfs::Query q(conn);
 		do {
 			qfs::Transaction transaction(conn);
@@ -876,12 +876,21 @@ static QString copy_sql_table(const QString &table_name, const QSqlRecord &dest_
 			rec.append(dest_rec.field(i));
 		}
 	}
+	bool is_import_offrace = false;
+	if(table_name == QLatin1String("runs")) {
+		if(!src_rec.contains("isRunning") && dest_rec.contains("isRunning") && src_rec.contains("offRace")) {
+			is_import_offrace = true;
+			rec.append(dest_rec.field("isRunning"));
+		}
+	}
 	auto *sqldrv = to_conn.driver();
 	QString qs = sqldrv->sqlStatement(QSqlDriver::InsertStatement, table_name, rec, true);
 	qfDebug() << qs;
 	qfs::Query to_q(to_conn);
 	if(!to_q.prepare(qs)) {
-		return QString("Cannot prepare insert table SQL statement, table: %1.").arg(table_name);
+		QString ret = QString("Cannot prepare insert table SQL statement, table: %1.\n%2").arg(table_name).arg(to_q.lastErrorText());
+		qfInfo() << qs;
+		return ret;
 	}
 	bool has_id_int = false;
 	while(from_q.next()) {
@@ -893,8 +902,15 @@ static QString copy_sql_table(const QString &table_name, const QSqlRecord &dest_
 			QSqlField fld = rec.field(i);
 			QString fld_name = fld.name();
 			//qfDebug() << "copy:" << fld_name << from_q.value(fld_name);
-			QVariant v = from_q.value(fld_name);
-			v.convert(rec.field(i).type());
+			QVariant v;
+			if((fld_name.compare(QLatin1String("isRunning"), Qt::CaseInsensitive) == 0) && is_import_offrace) {
+				bool offrace = from_q.value(QStringLiteral("offRace")).toBool();
+				v = offrace? QVariant(): QVariant(true);
+			}
+			else {
+				v = from_q.value(fld_name);
+				v.convert(rec.field(i).type());
+			}
 			if(!has_id_int
 					&& (fld.type() == QVariant::Int
 						|| fld.type() == QVariant::UInt
@@ -1003,7 +1019,7 @@ void EventPlugin::importEvent_qbe()
 	QString fn = qf::qmlwidgets::dialogs::FileDialog::getOpenFileName (fwk, tr("Import as Quick Event"), QString(), tr("Quick Event files *%1 (*%1)").arg(ext));
 	if(fn.isEmpty())
 		return;
-	QString event_name = qf::core::utils::FileUtils::baseName(fn) + "-2";
+	QString event_name = qf::core::utils::FileUtils::baseName(fn) + "_2";
 	event_name = QInputDialog::getText(fwk, tr("Query"), tr("Event will be imported as ID:"), QLineEdit::Normal, event_name).trimmed();
 	if(event_name.isEmpty())
 		return;
