@@ -130,7 +130,7 @@ void RunsTableWidget::reload(int stage_id, int class_id, bool show_offrace, cons
 	}
 	qfs::QueryBuilder qb;
 	qb.select2("runs", "*")
-			.select2("competitors", "registration, siId, note")
+			.select2("competitors", "id, registration, startNumber, siId, note")
 			.select2("classes", "name")
 			.select("COALESCE(lastName, '') || ' ' || COALESCE(firstName, '') AS competitorName")
 			.select("'' AS disqReason")
@@ -146,7 +146,7 @@ void RunsTableWidget::reload(int stage_id, int class_id, bool show_offrace, cons
 		qb.where("runs.isRunning");
 	qfDebug() << qb.toString();
 	m_runsTableItemDelegate->setHighlightedClassId(class_id, stage_id);
-	m_runsModel->setQueryBuilder(qb);
+	m_runsModel->setQueryBuilder(qb, false);
 	m_runsModel->reload();
 
 	ui->tblRuns->horizontalHeader()->setSectionHidden(RunsTableModel::col_runs_isRunning, !show_offrace);
@@ -248,13 +248,14 @@ void RunsTableWidget::onCustomContextMenuRequest(const QPoint &pos)
 			int interval = ui->lblClassInterval->text().toInt();
 			if(interval == 0)
 				interval = 1;
-			offset_msec = QInputDialog::getInt(this, tr("Get number"), tr("Start times offset [min]:"), 0, -1000, 1000, interval);
-			if(offset_msec != 0) {
+			bool ok;
+			offset_msec = QInputDialog::getInt(this, tr("Get number"), tr("Start times offset [min]:"), 0, -1000, 1000, interval, &ok);
+			if(ok) {
 				offset_msec *= 60 * 1000;
 
 				qfs::Transaction transaction;
 				qfs::Query q(transaction.connection());
-				q.prepare("UPDATE runs SET startTimeMs = startTimeMs + :offset WHERE id=:id", qf::core::Exception::Throw);
+				q.prepare("UPDATE runs SET startTimeMs = COALESCE(startTimeMs, 0) + :offset WHERE id=:id", qf::core::Exception::Throw);
 				QList<int> rows = ui->tblRuns->selectedRowsIndexes();
 				for(int ix : rows) {
 					qf::core::utils::TableRow row = ui->tblRuns->tableRow(ix);
