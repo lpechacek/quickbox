@@ -343,7 +343,9 @@ void TableView::cloneRowInline()
 		insertRowInline();
 		qfu::TableRow &r2 = tableRowRef();
 		for(int i=0; i<r1.fieldCount() && i<r2.fieldCount(); i++) {
-			r2.setValue(i, r1.value(i));
+			QVariant v1 = r1.value(i);
+			r2.setValue(i, v1);
+			//qfInfo() << i << v1 << r2.value(i);
 		}
 		r2.prepareForCopy();
 	}
@@ -1107,7 +1109,7 @@ void TableView::seek(const QString &prefix_str)
 			/// QTBUG-37689 QCollator allways sorts case sensitive
 			/// workarounded by own implementation of qf::core::Collator
 			QStringRef ps(&prefix_str);
-			QStringRef ds(&data_str, 0, prefix_str.length());
+			QStringRef ds(&data_str, 0, qMin(prefix_str.length(), data_str.length()));
 			//QString ps = prefix_str.toLower();
 			//QString ds = data_str.mid(0, ps.length()).toLower();
 			int cmp = sort_collator.compare(ps, ds);
@@ -1152,6 +1154,7 @@ int TableView::toTableModelRowNo(int table_view_row_no) const
 void TableView::loadPersistentSettings()
 {
 	QString path = persistentSettingsPath();
+	//qfInfo() << Q_FUNC_INFO << this << path;
 	qfLogFuncFrame() << path;
 	if(!path.isEmpty()) {
 		HeaderView *horiz_header = qobject_cast<HeaderView*>(horizontalHeader());
@@ -1252,6 +1255,7 @@ void TableView::loadPersistentSettings()
 void TableView::savePersistentSettings()
 {
 	QString path = persistentSettingsPath();
+	//qfInfo() << Q_FUNC_INFO << this << path;
 	qfLogFuncFrame() << path;
 	if(!path.isEmpty()) {
 		QSettings settings;
