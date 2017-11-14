@@ -71,10 +71,10 @@ RunsTableWidget::RunsTableWidget(QWidget *parent) :
 	ui->tblRuns->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(ui->tblRuns, &qfw::TableView::customContextMenuRequested, this, &RunsTableWidget::onCustomContextMenuRequest);
 
-	auto m = new RunsTableModel(this);
-	ui->tblRuns->setTableModel(m);
-	m_runsModel = m;
+	m_runsModel = new RunsTableModel(this);
+	connect(m_runsModel, &RunsTableModel::badDataInput, this, &RunsTableWidget::onBadTableDataInput, Qt::QueuedConnection);
 	connect(m_runsModel, &RunsTableModel::runnerSiIdEdited, runsPlugin(), &Runs::RunsPlugin::clearRunnersTableCache);
+	ui->tblRuns->setTableModel(m_runsModel);
 
 	// this ensures that table is sorted every time when start time is edited
 	ui->tblRuns->sortFilterProxyModel()->setDynamicSortFilter(true);
@@ -130,7 +130,7 @@ void RunsTableWidget::reload(int stage_id, int class_id, bool show_offrace, cons
 	}
 	qfs::QueryBuilder qb;
 	qb.select2("runs", "*")
-			.select2("competitors", "id, registration, startNumber, siId, note")
+			.select2("competitors", "id, registration, licence, ranking, startNumber, siId, note")
 			.select2("classes", "name")
 			.select("COALESCE(lastName, '') || ' ' || COALESCE(firstName, '') AS competitorName")
 			.select("'' AS disqReason")
@@ -177,13 +177,13 @@ void RunsTableWidget::reload(int stage_id, int class_id, bool show_offrace, cons
 void RunsTableWidget::onCustomContextMenuRequest(const QPoint &pos)
 {
 	qfLogFuncFrame();
-	QAction a_show_card(tr("Show receipt"), nullptr);
+	QAction a_show_receipt(tr("Show receipt"), nullptr);
 	QAction a_load_card(tr("Load times from card in selected rows"), nullptr);
 	QAction a_print_card(tr("Print card"), nullptr);
 	QAction a_sep1(nullptr); a_sep1.setSeparator(true);
 	QAction a_shift_start_times(tr("Shift start times in selected rows"), nullptr);
 	QList<QAction*> lst;
-	lst << &a_show_card << &a_load_card << &a_print_card
+	lst << &a_show_receipt << &a_load_card << &a_print_card
 		<< &a_sep1
 		<< &a_shift_start_times;
 	QAction *a = QMenu::exec(lst, ui->tblRuns->viewport()->mapToGlobal(pos));
@@ -210,7 +210,7 @@ void RunsTableWidget::onCustomContextMenuRequest(const QPoint &pos)
 		}
 		fwk->hideProgress();
 	}
-	else if(a == &a_show_card) {
+	else if(a == &a_show_receipt) {
 		int run_id = ui->tblRuns->tableRow().value(QStringLiteral("runs.id")).toInt();
 		Runs::RunsPlugin *runs_plugin = runsPlugin();
 		if(!runs_plugin)
@@ -284,6 +284,11 @@ void RunsTableWidget::onTableViewSqlException(const QString &what, const QString
 		return;
 	}
 	qf::qmlwidgets::dialogs::MessageBox::showException(this, what, where, stack_trace);
+}
+
+void RunsTableWidget::onBadTableDataInput(const QString &message)
+{
+	qf::qmlwidgets::dialogs::MessageBox::showError(this, message);
 }
 
 

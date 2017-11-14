@@ -11,6 +11,8 @@
 #include <QDomDocument>
 #include <QPrinter>
 #include <QPrinterInfo>
+#include <QTcpSocket>
+#include <QTextCodec>
 
 //#define QF_TIMESCOPE_ENABLED
 #include <qf/core/utils/fileutils.h>
@@ -70,7 +72,7 @@ void ReceiptsPrinter::printReceipt(const QString &report_file_name, const QVaria
 			rp.setTableData(key, report_data.value(key));
 		}
 	}
-	if(printer_opts.printerType() == (int)ReceiptsPrinterOptions::PrinterType::GraphicPrinter) {
+	if(printer_opts.printerType() == ReceiptsPrinterOptions::PrinterType::GraphicPrinter) {
 		QF_TIME_SCOPE("process graphics");
 		{
 			QF_TIME_SCOPE("process report");
@@ -89,7 +91,7 @@ void ReceiptsPrinter::printReceipt(const QString &report_file_name, const QVaria
 		}
 		QF_SAFE_DELETE(printer);
 	}
-	else if(printer_opts.printerType() == (int)ReceiptsPrinterOptions::PrinterType::CharacterPrinter) {
+	else if(printer_opts.printerType() == ReceiptsPrinterOptions::PrinterType::CharacterPrinter) {
 		QDomDocument doc;
 		doc.setContent(QLatin1String("<?xml version=\"1.0\"?><report><body/></report>"));
 		QDomElement el_body = doc.documentElement().firstChildElement("body");
@@ -110,17 +112,55 @@ void ReceiptsPrinter::printReceipt(const QString &report_file_name, const QVaria
 				qfError() << "Cannot open file" << f.fileName() << "for writing!";
 			}
 		};
-		if(!printer_opts.characterPrinterDirectory().isEmpty()) {
-			QString fn = printer_opts.characterPrinterDirectory();
-			qf::core::utils::FileUtils::ensurePath(fn);
-			QCryptographicHash ch(QCryptographicHash::Sha1);
-			for(QByteArray ba : data_lines)
-				ch.addData(ba);
-			fn += '/' + QString::fromLatin1(ch.result().toHex().mid(0, 8)) + ".txt";
-			save_file(fn);
-		}
-		else if (!printer_opts.characterPrinterDevice().isEmpty()) {
-			save_file(printer_opts.characterPrinterDevice());
+		switch(printer_opts.characterPrinterType()) {
+			case ReceiptsPrinterOptions::CharacterPrinteType::Directory: {
+				if(!printer_opts.characterPrinterDirectory().isEmpty()) {
+					QString fn = printer_opts.characterPrinterDirectory();
+					qf::core::utils::FileUtils::ensurePath(fn);
+					QCryptographicHash ch(QCryptographicHash::Sha1);
+					for(QByteArray ba : data_lines)
+						ch.addData(ba);
+					fn += '/' + QString::fromLatin1(ch.result().toHex().mid(0, 8)) + ".txt";
+					save_file(fn);
+				}
+				break;
+			}
+			case ReceiptsPrinterOptions::CharacterPrinteType::LPT: {
+				if (!printer_opts.characterPrinterDevice().isEmpty()) {
+					save_file(printer_opts.characterPrinterDevice());
+				}
+				break;
+			}
+			case ReceiptsPrinterOptions::CharacterPrinteType::Network: {
+				if (!printer_opts.characterPrinterAddress().isEmpty()) {
+					QTcpSocket socket;
+					QString host = printer_opts.characterPrinterAddress().section(':', 0, 0);
+					int port = printer_opts.characterPrinterAddress().section(':', 1, 1).toInt();
+					if(port == 0)
+					    port = 9100;
+					socket.connectToHost(
+							host,
+							port,
+							QIODevice::WriteOnly);
+					if (socket.waitForConnected(1000)) {
+						for(const QByteArray& line : data_lines) {
+							socket.write(line);
+							socket.write("\n");
+						}
+						socket.disconnectFromHost();
+						if (!socket.waitForDisconnected(1000)) { // waiting till all data are sent
+							qfError() << "Error while closing the connection to printer: "
+									<< socket.error();
+						}
+					}
+					else {
+						qfError() << "Cannot open tcp connection to address "
+								<< host << " on port " << port
+								<< " reason: " << socket.error();
+					}
+				}
+				break;
+			}
 		}
 	}
 }
@@ -206,7 +246,7 @@ public:
 	//int printerLineWidth = 42;
 };
 
-void ReceiptsPrinter::createPrinterData_helper(const QDomElement &el, DirectPrintContext *print_context)
+void ReceiptsPrinter::createPrinterData_helper(const QDomElement &el, DirectPrintContext *print_context, const QString &text_encoding)
 {
 	//QByteArray text;
 	PrintLine pre_commands;
@@ -277,12 +317,21 @@ void ReceiptsPrinter::createPrinterData_helper(const QDomElement &el, DirectPrin
 			text_align = Qt::AlignRight;
 		else if(ta == QLatin1String("center"))
 			text_align = Qt::AlignHCenter;
-		QByteArray text = qf::core::Collator::toAscii7(QLocale::Czech, el.text(), false);
+		QByteArray text;
+		QTextCodec *tc = nullptr;
+		if(text_encoding != QLatin1String("ASCII7")) {
+			QByteArray ba = text_encoding.toUtf8();
+			tc = QTextCodec::codecForName(ba);
+		}
+		if(tc)
+			text = tc->fromUnicode(el.text());
+		else
+			text = qf::core::Collator::toAscii7(QLocale::Czech, el.text(), false);
 		print_context->line << PrintData(PrintData::Command::Text, text, text_width, text_align);
 	}
 	{
 		for(QDomElement el1 = el.firstChildElement(); !el1.isNull(); ) {
-			createPrinterData_helper(el1, print_context);
+			createPrinterData_helper(el1, print_context, text_encoding);
 			el1 = el1.nextSiblingElement();
 			if(!el1.isNull()) {
 				//if(!is_halign || (is_halign && print_context->horizontalLayoutNestCount == 1)) {
@@ -399,7 +448,7 @@ QList<QByteArray> ReceiptsPrinter::createPrinterData(const QDomElement &body, co
 {
 	DirectPrintContext dpc;
 	//dpc.printerLineWidth = printer_options.characterPrinterLineLength();
-	createPrinterData_helper(body, &dpc);
+	createPrinterData_helper(body, &dpc, printer_options.characterPrinterCodec());
 	/*
 	{
 		QByteArray ba;

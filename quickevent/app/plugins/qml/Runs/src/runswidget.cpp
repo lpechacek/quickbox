@@ -48,10 +48,13 @@ RunsWidget::RunsWidget(QWidget *parent) :
 
 	ui->cbxDrawMethod->addItem(tr("Randomized equidistant clubs"), static_cast<int>(DrawMethod::RandomizedEquidistantClubs));
 	ui->cbxDrawMethod->addItem(tr("Random number"), static_cast<int>(DrawMethod::RandomNumber));
+	ui->cbxDrawMethod->addItem(tr("Grouped: C, B+A (PSOB DH12-14)"), static_cast<int>(DrawMethod::GroupedC));
+	ui->cbxDrawMethod->addItem(tr("Grouped: C, B, A+E+R (PSOB DH16-20)"), static_cast<int>(DrawMethod::GroupedCB));
+	ui->cbxDrawMethod->addItem(tr("Grouped by ranking (PSOB DH21L)"), static_cast<int>(DrawMethod::GroupedRanking));
 	ui->cbxDrawMethod->addItem(tr("Equidistant clubs"), static_cast<int>(DrawMethod::EquidistantClubs));
 	ui->cbxDrawMethod->addItem(tr("Stage 1 reverse order"), static_cast<int>(DrawMethod::StageReverseOrder));
 	ui->cbxDrawMethod->addItem(tr("Handicap"), static_cast<int>(DrawMethod::Handicap));
-	ui->cbxDrawMethod->addItem(tr("Shift times"), static_cast<int>(DrawMethod::ShiftTimes));
+	ui->cbxDrawMethod->addItem(tr("Keep runners order"), static_cast<int>(DrawMethod::KeepOrder));
 	ui->frmDrawing->setVisible(false);
 
 	QMetaObject::invokeMethod(this, "lazyInit", Qt::QueuedConnection);
@@ -244,22 +247,26 @@ QList< QList<int> > RunsWidget::runnersByClubSortedByCount(int stage_id, int cla
 	return ret;
 }
 
-QList<int> RunsWidget::runsForClass(int stage_id, int class_id)
+QList<int> RunsWidget::runsForClass(int stage_id, int class_id, const QString &extra_where_condition, const QString &order_by)
 {
 	qfLogFuncFrame();
-	QList<int> ret = competitorsForClass(stage_id, class_id).values();
+	QList<int> ret = competitorsForClass(stage_id, class_id, extra_where_condition, order_by).values();
 	return ret;
 }
 
-QMap<int, int> RunsWidget::competitorsForClass(int stage_id, int class_id)
+QMap<int, int> RunsWidget::competitorsForClass(int stage_id, int class_id, const QString &extra_where_condition, const QString &order_by)
 {
-	qfLogFuncFrame();
+	qfLogFuncFrame() << "stage:" << stage_id << "class:" << class_id;
 	QMap<int, int> ret;
 	qf::core::sql::QueryBuilder qb;
 	qb.select2("runs", "id, competitorId")
 			.from("competitors")
 			.joinRestricted("competitors.id", "runs.competitorId", "runs.isRunning AND runs.stageId=" QF_IARG(stage_id), "JOIN")
 			.where("competitors.classId=" QF_IARG(class_id));
+	if(!extra_where_condition.isEmpty())
+		qb.where(extra_where_condition);
+	if(!order_by.isEmpty())
+		qb.orderBy(order_by);
 	qfs::Query q;
 	q.exec(qb.toString(), qf::core::Exception::Throw);
 	while(q.next()) {
@@ -383,7 +390,9 @@ void RunsWidget::on_btDraw_clicked()
 	qfLogFuncFrame();
 	int stage_id = selectedStageId();
 	DrawMethod draw_method = DrawMethod(ui->cbxDrawMethod->currentData().toInt());
-	qfDebug() << "DrawMethod:" << (int)draw_method;
+	Event::StageData stage_data = eventPlugin()->stageData(stage_id);
+	bool use_all_maps = stage_data.isUseAllMaps();
+	qfDebug() << "DrawMethod:" << (int)draw_method << "use_all_maps:" << use_all_maps;
 	QList<int> class_ids;
 	int class_id = m_cbxClasses->currentData().toInt();
 	if(class_id == 0) {
@@ -412,37 +421,10 @@ void RunsWidget::on_btDraw_clicked()
 	try {
 		qf::core::sql::Transaction transaction(qfs::Connection::forName());
 		for(int class_id : class_ids) {
-			if(draw_method == DrawMethod::ShiftTimes) {
-				qfs::Query q(transaction.connection());
-				QString class_name;
-				q.exec("SELECT name FROM classes WHERE id=" QF_IARG(class_id), qf::core::Exception::Throw);
-				if(q.next())
-					class_name = q.value(0).toString();
-
-				int offset_msec = 0;
-				offset_msec = QInputDialog::getInt(this, tr("Get number"), tr("Start times offset for class %1 [min]:").arg(class_name), 0, -1000, 1000, 1);
-				if(offset_msec == 0)
-					continue;
-				offset_msec *= 60 * 1000;
-
-				q.prepare("UPDATE runs SET startTimeMs = startTimeMs + :offset WHERE id=:id", qf::core::Exception::Throw);
-				for(int id : runsForClass(stage_id, class_id)) {
-					q.bindValue(QStringLiteral(":offset"), offset_msec);
-					q.bindValue(QStringLiteral(":id"), id);
-					q.exec(qf::core::Exception::Throw);
-				}
-				int last_start_time = 0;
-				q.exec("SELECT lastStartTimeMin FROM classdefs WHERE classId=" QF_IARG(class_id) " AND stageId=" QF_IARG(stage_id), qf::core::Exception::Throw);
-				if(q.next())
-					last_start_time = q.value(0).toInt();
-				saveLockedForDrawing(class_id, stage_id, true, last_start_time + offset_msec / 60 / 1000);
-				continue;
-			}
-
 			int handicap_length_ms = eventPlugin()->eventConfig()->handicapLength() * 60 * 1000;
 			QVector<int> handicap_times;
 			qf::core::sql::QueryBuilder qb;
-			qb.select2("classdefs", "startTimeMin, startIntervalMin, vacantsBefore, vacantEvery, vacantsAfter")
+			qb.select2("classdefs", "startTimeMin, startIntervalMin, vacantsBefore, vacantEvery, vacantsAfter, mapCount")
 					.from("classdefs")
 					.where("stageId=" QF_IARG(stage_id))
 					.where("classId=" QF_IARG(class_id));
@@ -454,6 +436,34 @@ void RunsWidget::on_btDraw_clicked()
 			if(draw_method == DrawMethod::RandomNumber) {
 				runners_draw_ids = runsForClass(stage_id, class_id);
 				shuffle(runners_draw_ids);
+			}
+			else if(draw_method == DrawMethod::KeepOrder) {
+				runners_draw_ids = runsForClass(stage_id, class_id, QString(), "runs.startTimeMs");
+			}
+			else if(draw_method == DrawMethod::GroupedC) {
+				QList<int> group1 = runsForClass(stage_id, class_id, "licence='C' or licence is null");
+				QList<int> group2 = runsForClass(stage_id, class_id, "licence='A' or licence='B'");
+				shuffle(group1);
+				shuffle(group2);
+				runners_draw_ids = group1 + group2;
+			}
+			else if(draw_method == DrawMethod::GroupedCB) {
+				QList<int> group1 = runsForClass(stage_id, class_id, "licence='C' or licence is null");
+				QList<int> group2 = runsForClass(stage_id, class_id, "licence='B'");
+				QList<int> group3 = runsForClass(stage_id, class_id, "licence='A' or licence='R' or licence='E'");
+				shuffle(group1);
+				shuffle(group2);
+				shuffle(group3);
+				runners_draw_ids = group1 + group2 + group3;
+			}
+			else if(draw_method == DrawMethod::GroupedRanking) {
+				QList<int> group1 = runsForClass(stage_id, class_id, "ranking>300 or ranking is null");
+				QList<int> group2 = runsForClass(stage_id, class_id, "ranking>100 and ranking<=300");
+				QList<int> group3 = runsForClass(stage_id, class_id, "ranking<=100");
+				shuffle(group1);
+				shuffle(group2);
+				shuffle(group3);
+				runners_draw_ids = group1 + group2 + group3;
 			}
 			else if(draw_method == DrawMethod::Handicap) {
 				int stage_count = eventPlugin()->eventConfig()->stageCount();
@@ -583,11 +593,20 @@ void RunsWidget::on_btDraw_clicked()
 				int vacants_before = q_classdefs.value("vacantsBefore").toInt();
 				int vacant_every = q_classdefs.value("vacantEvery").toInt();
 				int vacants_after = q_classdefs.value("vacantsAfter").toInt();
+				int map_count = q_classdefs.value("mapCount").toInt();
 				int start = start0;
 				int n = 0;
 
+				if(map_count <= 0)
+					use_all_maps = false;
+
 				if(draw_method != DrawMethod::Handicap) {
 					start += vacants_before * interval;
+					if(use_all_maps) {
+						map_count -= vacants_before;
+						int spare_map_count = (map_count - vacants_after - runners_draw_ids.count());
+						vacant_every = runners_draw_ids.count() / spare_map_count;
+					}
 				}
 
 				qfs::Query q(transaction.connection());
@@ -609,12 +628,20 @@ void RunsWidget::on_btDraw_clicked()
 						q.bindValue(QStringLiteral(":startTimeMs"), start);
 						q.exec(qf::core::Exception::Throw);
 						start += interval;
-						if(vacant_every > 0 && ((n+1) % vacant_every) == 0)
-							start += interval;
 						n++;
+						map_count--;
+						bool can_add_vacant = true;
+						if(use_all_maps) {
+							can_add_vacant = (map_count > vacants_after);
+						}
+						if(can_add_vacant && vacant_every > 0 && (n % vacant_every) == 0)
+							start += interval;
 					}
 				}
-				start += (vacants_after - 1) * interval;
+				if(use_all_maps)
+					vacants_after = map_count;
+				if(vacants_after > 0)
+					start += (vacants_after - 1) * interval;
 				saveLockedForDrawing(class_id, stage_id, true, start / 60 / 1000);
 			}
 		}

@@ -30,6 +30,8 @@ RunsTableModel::RunsTableModel(QObject *parent)
 	setColumn(col_competitors_siId, ColumnDefinition("competitors.siId", tr("SI")).setToolTip(tr("Registered SI")).setReadOnly(true));
 	setColumn(col_competitorName, ColumnDefinition("competitorName", tr("Name")));
 	setColumn(col_registration, ColumnDefinition("registration", tr("Reg")));
+	setColumn(col_runs_license, ColumnDefinition("licence", tr("Lic")).setToolTip(tr("License")));
+	setColumn(col_runs_ranking, ColumnDefinition("ranking", tr("Rank")).setToolTip(tr("Ranking")));
 	setColumn(col_runs_siId, ColumnDefinition("runs.siId", tr("SI")).setToolTip(tr("Actual SI")).setCastType(qMetaTypeId<quickevent::si::SiId>()));
 	setColumn(col_runs_startTimeMs, ColumnDefinition("runs.startTimeMs", tr("Start")).setCastType(qMetaTypeId<quickevent::og::TimeMs>()));
 	setColumn(col_runs_timeMs, ColumnDefinition("runs.timeMs", tr("Time")).setCastType(qMetaTypeId<quickevent::og::TimeMs>()));
@@ -90,6 +92,13 @@ bool RunsTableModel::setValue(int row_ix, int column_ix, const QVariant &val)
 	//qfInfo() << column_ix << val << val.typeName() << "is null:" << val.isNull();
 	if(column_ix == col_runs_isRunning) {
 		bool is_running = val.toBool();
+		if(!is_running) {
+			int finish_ms = value(row_ix, col_runs_finishTimeMs).toInt();
+			if(finish_ms > 0) {
+				emit badDataInput(tr("Canont set not running flag for competitor with valid finish time."));
+				return false;
+			}
+		}
 		return Super::setValue(row_ix, column_ix, is_running? is_running: QVariant());
 	}
 	if(column_ix == col_runs_finishTimeMs) {

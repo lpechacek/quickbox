@@ -14,6 +14,7 @@ class EVENTPLUGIN_DECL_EXPORT EventConfig : public QObject
 {
 	Q_OBJECT
 	Q_PROPERTY(int stageCount READ stageCount)
+	Q_PROPERTY(bool isHandicap READ isHandicap)
 	//Q_PROPERTY(QString eventName READ eventName)
 public:
 	explicit EventConfig(QObject *parent = 0);
@@ -29,8 +30,10 @@ public slots:
 
 	int stageCount() const;
 	int currentStageId() const;
+	int sportId() const;
 	int importId() const;
 	int handicapLength() const;
+	bool isHandicap() const {return handicapLength() > 0;}
 	QString director() const;
 	QString mainReferee() const;
 	QDateTime eventDateTime() const;

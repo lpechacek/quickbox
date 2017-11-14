@@ -17,6 +17,7 @@
 #include <qf/core/sql/query.h>
 #include <qf/core/sql/connection.h>
 #include <qf/core/sql/transaction.h>
+#include <qf/core/sql/querybuilder.h>
 
 #include <QJSValue>
 #include <QMetaObject>
@@ -26,6 +27,7 @@
 #include <qf/core/utils/timescope.h>
 
 namespace qff = qf::qmlwidgets::framework;
+namespace qfs = qf::core::sql;
 
 namespace CardReader {
 
@@ -86,12 +88,34 @@ int CardReaderPlugin::findRunId(int si_id)
 {
 	int stage_no = currentStageId();
 	qf::core::sql::Query q;
-	q.exec("SELECT id FROM runs WHERE stageId=" QF_IARG(stage_no) " AND siId=" QF_IARG(si_id), qf::core::Exception::Throw);
+	q.exec("SELECT id FROM runs WHERE stageId=" QF_IARG(stage_no) " AND siId=" QF_IARG(si_id) " AND isRunning", qf::core::Exception::Throw);
 	int ret = 0;
 	if(q.next()) {
 		ret = q.value(0).toInt();
 	}
 	return ret;
+}
+
+bool CardReaderPlugin::isCardLent(int si_id, int run_id)
+{
+	bool card_lent = false;
+	bool card_returned = false;
+	if(run_id == 0)
+		run_id = findRunId(si_id);
+	qf::core::sql::Query q;
+	if(run_id > 0) {
+		q.exec("SELECT cardLent, cardReturned FROM runs WHERE id=" QF_IARG(run_id) );
+		if(q.next()) {
+			card_lent = q.value(0).toBool();
+			card_returned = q.value(1).toBool();
+		}
+	}
+	if(!card_lent && !card_returned) {
+		q.exec("SELECT siId FROM lentcards WHERE NOT ignored AND siid=" QF_IARG(si_id) );
+		if(q.next())
+			card_lent = true;
+	}
+	return (card_lent && !card_returned);
 }
 
 ReadCard CardReaderPlugin::readCard(int card_id)
@@ -127,17 +151,24 @@ CardReader::CheckedCard CardReaderPlugin::checkCard(const ReadCard &read_card)
 	//updateRunLapsSql(card, run_id);
 	CardReader::CardChecker *chk = currentCardChecker();
 	QF_ASSERT(chk != nullptr, "CardChecker is NULL", return CardReader::CheckedCard());
-	QVariant ret_val;
-	QMetaObject::invokeMethod(chk, "checkCard", Qt::DirectConnection,
-	                          Q_RETURN_ARG(QVariant, ret_val),
-	                          Q_ARG(QVariant, read_card));
-	QJSValue jsv = ret_val.value<QJSValue>();
-	QVariant v = jsv.toVariant();
-	QVariantMap m = v.toMap();
-	CardReader::CheckedCard cc(m);
-	cc.setCardNumber(read_card.cardNumber());
-	//cc.setCardId(read_card.cardId());
-	return cc;
+	CardReader::CppCardChecker *cpp_chk = dynamic_cast<CardReader::CppCardChecker*>(chk);
+	if(cpp_chk) {
+		CheckedCard cc = cpp_chk->checkCard(read_card);
+		return cc;
+	}
+	else {
+		QVariant ret_val;
+		QMetaObject::invokeMethod(chk, "checkCard", Qt::DirectConnection,
+								  Q_RETURN_ARG(QVariant, ret_val),
+								  Q_ARG(QVariant, read_card));
+		QJSValue jsv = ret_val.value<QJSValue>();
+		QVariant v = jsv.toVariant();
+		QVariantMap m = v.toMap();
+		CardReader::CheckedCard cc(m);
+		cc.setCardNumber(read_card.cardNumber());
+		//cc.setCardId(read_card.cardId());
+		return cc;
+	}
 }
 
 int CardReaderPlugin::saveCardToSql(const CardReader::ReadCard &read_card)
@@ -181,7 +212,6 @@ int CardReaderPlugin::savePunchRecordToSql(const quickevent::si::PunchRecord &pu
 	int stage_start_msec = event_plugin->stageStartMsec(event_plugin->currentStageId());
 	int time_msec = quickevent::og::TimeMs::msecIntervalAM(stage_start_msec, punch_record.time() * 1000 + punch_record.msec());
 	punch.settimems(time_msec);
-
 	qf::core::sql::Query q;
 	int run_id = punch.runid();
 	if(run_id > 0) {
@@ -194,11 +224,13 @@ int CardReaderPlugin::savePunchRecordToSql(const quickevent::si::PunchRecord &pu
 		}
 	}
 
+	int code = resolveAltCode(punch.code(), punch.stageid());
+
 	q.prepare(QStringLiteral("INSERT INTO punches (siId, code, time, msec, runId, stageId, timeMs, runTimeMs, marking)"
 							 " VALUES (:siId, :code, :time, :msec, :runId, :stageId, :timeMs, :runTimeMs, :marking)")
 							, qf::core::Exception::Throw);
 	q.bindValue(QStringLiteral(":siId"), punch.siid());
-	q.bindValue(QStringLiteral(":code"), punch.code());
+	q.bindValue(QStringLiteral(":code"), code);
 	q.bindValue(QStringLiteral(":time"), punch.time());
 	q.bindValue(QStringLiteral(":msec"), punch.msec());
 	q.bindValue(QStringLiteral(":runId"), punch.runid());
@@ -239,7 +271,7 @@ void CardReaderPlugin::updateCheckedCardValuesSql(const CardReader::CheckedCard 
 	auto cc = qf::core::sql::Connection::forName();
 	qf::core::sql::Query q(cc);
 	{
-		QF_TIME_SCOPE("delete from runlaps");
+		QF_TIME_SCOPE("DELETE FROM runlaps");
 		q.exec("DELETE FROM runlaps WHERE runId=" QF_IARG(run_id), qf::core::Exception::Throw);
 	}
 	q.prepare(QStringLiteral("INSERT INTO runlaps (runId, position, code, stpTimeMs, lapTimeMs) VALUES (:runId, :position, :code, :stpTimeMs, :lapTimeMs)"), qf::core::Exception::Throw);
@@ -249,7 +281,7 @@ void CardReaderPlugin::updateCheckedCardValuesSql(const CardReader::CheckedCard 
 		for(auto v : punch_list) {
 			position++;
 			CardReader::CheckedPunch cp(v.toMap());
-			//qfInfo() << cp;
+			//qfInfo() << run_id << position << cp;
 			if(cp.stpTimeMs() > 0 && cp.lapTimeMs() > 0) {
 				q.bindValue(QStringLiteral(":runId"), run_id);
 				q.bindValue(QStringLiteral(":code"), cp.code());
@@ -304,11 +336,60 @@ bool CardReaderPlugin::reloadTimesFromCard(int card_id, int run_id)
 		return false;
 	}
 	CardReader::CheckedCard checked_card = checkCard(card_id, run_id);
-	qfInfo() << Q_FUNC_INFO << checked_card.isMisPunch() << checked_card.isOk();
+	//qfInfo() << Q_FUNC_INFO << checked_card.isMisPunch() << checked_card.isOk();
 	if(updateCheckedCardValuesSqlSafe(checked_card))
 		if(saveCardAssignedRunnerIdSql(card_id, run_id))
 			return true;
 	return false;
+}
+
+//static QMap<int, QMap<int, int>> m_altCodes; // stageId -> altCode -> code
+
+int CardReaderPlugin::resolveAltCode(int maybe_alt_code, int stage_id)
+{
+	/*
+	 * static caching is evil, better to emit dbevent when codes are edited and clear this cache then
+	if(!m_altCodes.contains(stage_id)) {
+		qfs::QueryBuilder qb;
+		qb.select2("codes", "code, altcode")
+				.from("codes")
+				.joinRestricted("codes.id", "coursecodes.codeId", "codes.altCode > 0", qfs::QueryBuilder::INNER_JOIN)
+				.joinRestricted("coursecodes.courseId", "classdefs.courseId", "classdefs.stageId=" QF_IARG(stage_id), qfs::QueryBuilder::INNER_JOIN);
+		qfs::Query q;
+		q.exec(qb, qf::core::Exception::Throw);
+		while (q.next()) {
+			int code = q.value(0).toInt();
+			int alt_code = q.value(1).toInt();
+			qfDebug() << "stage id:" << stage_id << "alt code:" << alt_code << "->" << code;
+			m_altCodes[stage_id][alt_code] = code;
+		}
+	}
+	int resolved_code = m_altCodes[stage_id].value(maybe_alt_code);
+	if(resolved_code > 0) {
+		qfDebug() << "stage:" << stage_id << "alt code:" << maybe_alt_code << "resolved to:" << resolved_code;
+		return resolved_code;
+	}
+	return maybe_alt_code;
+	*/
+	int resolved_code = 0;
+	qfs::QueryBuilder qb;
+	qb.select2("codes", "code")
+			.from("codes")
+			.joinRestricted("codes.id", "coursecodes.codeId", "codes.altCode=" QF_IARG(maybe_alt_code), qfs::QueryBuilder::INNER_JOIN)
+			.joinRestricted("coursecodes.courseId", "classdefs.courseId", "classdefs.stageId=" QF_IARG(stage_id), qfs::QueryBuilder::INNER_JOIN);
+	qfDebug() << qb.toString();
+	qfs::Query q;
+	q.exec(qb, qf::core::Exception::Throw);
+	while (q.next()) {
+		if(resolved_code) {
+			qfError() << "duplicate alt code" << maybe_alt_code << "in stage:" << stage_id;
+			return maybe_alt_code;
+		}
+		resolved_code = q.value(0).toInt();
+	}
+	if(resolved_code > 0)
+		qfDebug() << "alt code:" << maybe_alt_code << "resolved to:" << resolved_code;
+	return (resolved_code > 0)? resolved_code: maybe_alt_code;
 }
 
 }

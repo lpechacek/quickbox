@@ -55,7 +55,7 @@ ReadCard::ReadCard(const QSqlRecord &rec)
 }
 
 ReadCard::ReadCard(const SIMessageCardReadOut &si_card)
-	: Super(si_card.toVariantMap())
+	: ReadCard(si_card.toVariantMap())
 {
 }
 
@@ -68,6 +68,15 @@ ReadPunch ReadCard::punchAt(int i) const
 {
 	QVariantMap m = punches().value(i).toMap();
 	return ReadPunch(m);
+}
+
+QList<ReadPunch> ReadCard::punchList() const
+{
+	QList<ReadPunch> ret;
+	for (int i = 0; i < punchCount(); ++i) {
+		ret << punchAt(i);
+	}
+	return ret;
 }
 /*
 int ReadCard::timeMs() const

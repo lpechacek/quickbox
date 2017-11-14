@@ -92,6 +92,7 @@ QtObject {
 		return tt;
 	}
 	*/
+	/*
 	function currentStageAwardsTable(max_competitors_in_class)
 	{
 		var event_plugin = FrameWork.plugin("Event");
@@ -154,14 +155,12 @@ QtObject {
 		//console.warn(tt.toString());
 		return tt;
 	}
-
+*/
 	function printCurrentStage()
 	{
 		Log.info("runs printResultsCurrentStage triggered");
 		var dlg = runsPlugin.createReportOptionsDialog(FrameWork);
 		dlg.persistentSettingsId = "resultsReportOptions";
-		//dlg.dialogType = RunsPlugin.ResultsReport;
-		//var mask = InputDialogSingleton.getText(this, qsTr("Get text"), qsTr("Class mask (use wild cards [*?]):"), "*");
 		if(dlg.exec()) {
 			var td = currentStageTableData(dlg.sqlWhereExpression());
 			QmlWidgetsSingleton.showReport(runsPlugin.manifest.homeDir + "/reports/results_stage.qml"
@@ -184,15 +183,25 @@ QtObject {
 
 	function printCurrentStageAwards()
 	{
-		Log.info("runs printCurrentStageAwards triggered");
-		var n = InputDialogSingleton.getInt(this, qsTr("Get number"), qsTr("Number of places in each class:"), 3, 1);
-		var tt = currentStageAwardsTable(n);
-		QmlWidgetsSingleton.showReport(runsPlugin.manifest.homeDir + "/reports/results_stage_awards.qml"
+		var event_plugin = FrameWork.plugin("Event");
+		var opts = {stageId: event_plugin.currentStageId}
+		opts = runsPlugin.printAwardsOptionsWithDialog(opts);
+		var rep_path = opts.reportPath;
+		if(!rep_path)
+			return;
+
+		//var n = opts.numPlaces;
+		//var tt = currentStageAwardsTable(n);
+		var td = runsPlugin.stageResultsTableData(opts.stageId, "", opts.numPlaces);
+		var tt = new TreeTable.Table();
+		tt.setData(td);
+
+		Log.info("runs printCurrentStageAwards", rep_path);
+		QmlWidgetsSingleton.showReport(rep_path
 									   , tt.data()
 									   , qsTr("Stage awards")
 									   , ""
 									   , {eventConfig: FrameWork.plugin("Event").eventConfig});
-									//   , {eventConfig: FrameWork.plugin("Event").eventConfig.values()});
 	}
 
 	function exportIofXml2(file_path)
@@ -255,7 +264,7 @@ QtObject {
 				else if (tt2.value(j, "notCompeting"))
 					competitor_status = 'NotCompeting'
 				if (competitor_status == 'OK')
-					result.push(['ResultPosition', tt2.value(j, "pos")])
+					result.push(['ResultPosition', tt2.value(j, "npos")])
 				result.push(['CompetitorStatus', {"value": competitor_status}])
 				/*
 				  according to DTD
@@ -320,21 +329,23 @@ QtObject {
 										   , {stagesCount: dlg.stagesCount});
 		}
 		dlg.destroy();
-		//var n = InputDialogSingleton.getInt(this, qsTr("Get number"), qsTr("Number of stages:"), stage_id, 1, event_plugin.stageCount);
-		//var places = InputDialogSingleton.getInt(this, qsTr("Get number"), qsTr("Number of places in each class:"), 9999, 1);
 	}
 
 	function printNStageAwards()
 	{
 		Log.info("runs printNStageAwards triggered");
 		var event_plugin = FrameWork.plugin("Event");
-		var stage_id = event_plugin.currentStageId;
-		var stage = InputDialogSingleton.getInt(this, qsTr("Get number"), qsTr("Number of stages:"), stage_id, 1, event_plugin.stageCount);
-		var places = InputDialogSingleton.getInt(this, qsTr("Get number"), qsTr("Number of places in each class:"), 3, 1);
-		var tt = nStagesResultsTable(stage, places);
-		console.info(tt.toString());
-		QmlWidgetsSingleton.showReport(runsPlugin.manifest.homeDir + "/reports/results_nstages_awards.qml", tt.data(), qsTr("Stage awards"));
+		var opts = {stageId: event_plugin.currentStageId}
+		opts = runsPlugin.printAwardsOptionsWithDialog(opts);
+		var rep_path = opts.reportPath;
+		if(!rep_path)
+			return;
+		var tt = nStagesResultsTable(opts.stageId, opts.numPlaces);
+		QmlWidgetsSingleton.showReport(rep_path
+									   , tt.data()
+									   , qsTr("Stage awards")
+									   , ""
+									   , {eventConfig: FrameWork.plugin("Event").eventConfig});
 	}
-
 }
 

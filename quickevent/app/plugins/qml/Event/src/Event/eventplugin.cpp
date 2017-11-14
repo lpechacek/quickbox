@@ -166,6 +166,22 @@ int EventPlugin::currentStageId()
 	return m_cbxStage->currentIndex() + 1;
 }
 
+int EventPlugin::stageIdForRun(int run_id)
+{
+	int ret = 0;
+	qfs::QueryBuilder qb;
+	qb.select2("runs", "stageId")
+			.from("runs")
+			.where("runs.id=" QF_IARG(run_id));
+	qfs::Query q;
+	q.exec(qb.toString(), qf::core::Exception::Throw);
+	if(q.next())
+		ret = q.value(0).toInt();
+	else
+		qfError() << "Cannot find runs record for id:" << run_id;
+	return ret;
+}
+
 int EventPlugin::stageStartMsec(int stage_id)
 {
 	QTime start_time = stageStartTime(stage_id);
@@ -188,6 +204,15 @@ QDateTime EventPlugin::stageStartDateTime(int stage_id)
 	Event::StageData stage_data = stageData(stage_id);
 	QDateTime dt = stage_data.startDateTime();
 	return dt;
+}
+
+void EventPlugin::setStageData(int stage_id, const QString &key, const QVariant &value)
+{
+	Event::StageDocument doc;
+	doc.load(stage_id);
+	doc.setValue(key, value);
+	doc.save();
+	clearStageDataCache();
 }
 
 StageData EventPlugin::stageData(int stage_id)
@@ -266,6 +291,7 @@ void EventPlugin::onInstalled()
 
 	qfw::ToolBar *tb = fwk->toolBar("Event", true);
 	tb->setObjectName("EventToolbar");
+	tb->setWindowTitle(tr("Event"));
 	{
 		QToolButton *bt_stage = new QToolButton();
 		//bt_stage->setFlat(true);
@@ -293,6 +319,7 @@ void EventPlugin::onInstalled()
 			m_actEditStage->setVisible(checked);
 		});
 	}
+	fwk->menuBar()->actionForPath("view/toolbar")->addActionInto(tb->toggleViewAction());
 }
 
 void EventPlugin::onCbxStageActivated(int ix)
@@ -398,7 +425,7 @@ DbSchema EventPlugin::dbSchema()
 
 int EventPlugin::minDbVersion()
 {
-	return 10100;
+	return 10103;
 }
 
 void EventPlugin::onDbEvent(const QString &name, QSqlDriver::NotificationSource source, const QVariant &payload)
@@ -658,7 +685,10 @@ bool EventPlugin::createEvent(const QString &event_name, const QVariantMap &even
 		QString event_fn = eventNameToFileName(event_id);
 		conn.close();
 		conn.setDatabaseName(event_fn);
-		conn.open();
+		if(!conn.open()) {
+			qfd::MessageBox::showError(fwk, tr("Open Database Error: %1").arg(conn.errorString()));
+			return false;
+		}
 	}
 	if(conn.isOpen()) {
 		QVariantMap create_options;

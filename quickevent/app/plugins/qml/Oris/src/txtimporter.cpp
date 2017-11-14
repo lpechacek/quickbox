@@ -175,7 +175,7 @@ void TxtImporter::importRankingCsv()
 		int n = 0;
 		while (!ts.atEnd()) {
 			QStringList line = reader.readCSVLineSplitted();
-			if(n++ == 0)
+			if(n++ == 0) // skip column names
 				continue;
 			QString registration = line.value(ColRegistration);
 			int pos = line.value(ColPos).toInt();
@@ -188,6 +188,7 @@ void TxtImporter::importRankingCsv()
 			q.exec(qf::core::Exception::Throw);
 		}
 		transaction.commit();
+		qfInfo() << fn << n << "lines imported";
 	}
 	catch (const qf::core::Exception &e) {
 		qf::qmlwidgets::dialogs::MessageBox::showException(fwk, e);

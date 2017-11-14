@@ -17,6 +17,8 @@ public:
 		col_competitors_siId,
 		col_competitorName,
 		col_registration,
+		col_runs_license,
+		col_runs_ranking,
 		col_runs_siId,
 		col_runs_startTimeMs,
 		col_runs_timeMs,
@@ -52,6 +54,7 @@ public:
 	void switchStartTimes(int r1, int r2);
 	Q_SIGNAL void startTimesSwitched(int id1, int id2, const QString &err_msg);
 	Q_SIGNAL void runnerSiIdEdited();
+	Q_SIGNAL void badDataInput(const QString &message);
 private:
 	void onDataChanged(const QModelIndex &top_left, const QModelIndex &bottom_right, const QVector<int> &roles);
 };

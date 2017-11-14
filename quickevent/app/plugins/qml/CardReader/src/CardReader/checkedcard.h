@@ -18,13 +18,17 @@ private:
 	QF_VARIANTMAP_FIELD(int, r, setR, unId)
 	QF_VARIANTMAP_FIELD(int, c, setC, ourseId)
 	QF_VARIANTMAP_FIELD(int, s, setS, tageStartTimeMs) //< stage start till midnight
-	QF_VARIANTMAP_FIELD(int, C, setC, heckTimeMs) //< check time till stage start
+	QF_VARIANTMAP_FIELD(int, c, setC, heckTimeMs) //< check time till stage start
 	QF_VARIANTMAP_FIELD(int, s, setS, tartTimeMs) //< start time till stage start
 	QF_VARIANTMAP_FIELD(int, f, setF, inishTimeMs) //< finish time till stage start
 	//QF_VARIANTMAP_FIELD2(int, f, setF, inishLapTimeMs, 0) //< finish lap time till competitor start time
 	//QF_VARIANTMAP_FIELD2(int, f, setF, inishStpTimeMs, 0) //< finish stp time till competitor start time
 	QF_VARIANTMAP_FIELD(int, c, setC, ardNumber)
-	QF_VARIANTMAP_FIELD(QVariantList, p, setP, unches) //< punch times including finish, all measured till competitor start time
+	// punch times for course including finish, all measured till competitor start time
+	// this list contains all the course puches for correct punching
+	// if runner has punched different control, it is not present in this list
+	// if runner has missed some of his control, the empty place is here
+	QF_VARIANTMAP_FIELD(QVariantList, p, setP, unches)
 	QF_VARIANTMAP_FIELD(bool, is, set, BadCheck)
 	QF_VARIANTMAP_FIELD(bool, is, set, MisPunch)
 

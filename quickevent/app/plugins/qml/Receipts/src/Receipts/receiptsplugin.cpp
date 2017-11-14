@@ -64,6 +64,23 @@ Event::EventPlugin *ReceiptsPlugin::eventPlugin()
 	return ret;
 }
 
+QString ReceiptsPlugin::currentReceiptPath()
+{
+	QString printer_options_key = ReceiptsPlugin::SETTINGS_PREFIX;
+	printer_options_key += "receipts/current";
+	qf::core::utils::Settings settings;
+	QString s = settings.value(printer_options_key).toString();
+	return s;
+}
+
+void ReceiptsPlugin::setCurrentReceiptPath(const QString &path)
+{
+	QString printer_options_key = ReceiptsPlugin::SETTINGS_PREFIX;
+	printer_options_key += "receipts/current";
+	qf::core::utils::Settings settings;
+	settings.setValue(printer_options_key, path);
+}
+
 ReceiptsPrinterOptions ReceiptsPlugin::receiptsPrinterOptions()
 {
 	QString printer_options_key = ReceiptsPlugin::SETTINGS_PREFIX;
@@ -169,8 +186,9 @@ QVariantMap ReceiptsPlugin::receiptTablesData(int card_id)
 	QVariantMap ret;
 	CardReader::ReadCard read_card = cardReaderPlugin()->readCard(card_id);
 	CardReader::CheckedCard checked_card = cardReaderPlugin()->checkCard(read_card);
-	int current_stage_id = eventPlugin()->currentStageId();
 	int run_id = checked_card.runId();
+	bool is_card_lent = cardReaderPlugin()->isCardLent(card_id, run_id);
+	int current_stage_id = eventPlugin()->stageIdForRun(run_id);
 	int course_id = checked_card.courseId();
 	int current_standings = 0;
 	int competitors_finished = 0;
@@ -195,12 +213,12 @@ QVariantMap ReceiptsPlugin::receiptTablesData(int card_id)
 			{
 				// find best laps for competitors class
 				qf::core::sql::QueryBuilder qb_minlaps;
-				// TODO: remove position field from DB in 0.1.5
 				qb_minlaps.select("runlaps.position, MIN(runlaps.lapTimeMs) AS minLapTimeMs")
 						.from("competitors")
 						.joinRestricted("competitors.id", "runs.competitorId", "runs.stageId=" QF_IARG(current_stage_id) " AND competitors.classId=" QF_IARG(class_id), "JOIN")
 						.joinRestricted("runs.id", "runlaps.runId", "runlaps.position > 0 AND runlaps.lapTimeMs > 0", "JOIN")
-						.groupBy("runlaps.position");
+						.groupBy("runlaps.position")
+						.orderBy("runlaps.position");
 				QString qs = qb_minlaps.toString();
 				//qfInfo() << qs;
 				qf::core::sql::Query q;
@@ -217,7 +235,7 @@ QVariantMap ReceiptsPlugin::receiptTablesData(int card_id)
 						continue;
 					}
 					best_laps[position] = lap;
-					//qfInfo() << "bestlaps[" << pos << "] =" << lap;
+					//qfInfo() << "bestlaps[" << position << "] =" << lap;
 				}
 			}
 			if(checked_card.isOk()) {
@@ -308,18 +326,6 @@ QVariantMap ReceiptsPlugin::receiptTablesData(int card_id)
 				ttr.setValue("lossMs", loss);
 			}
 		}
-		/*
-		{
-			// runlaps table contains also finish time entry, it is under FINISH_PUNCH_POS
-			// currently best_laps[999] contains best finish lap time for this class
-			int loss = 0;
-			int best_lap = best_laps.value(CardReader::CardReaderPlugin::FINISH_PUNCH_POS);
-			if(best_lap > 0)
-				loss = checked_card.finishLapTimeMs() - best_lap;
-			//qfInfo() << "control_count:" << control_count << "finishLapTimeMs:" << checked_card.finishLapTimeMs() << "- best_lap:" << best_lap << "=" << loss;
-			tt.setValue("finishLossMs", loss);
-		}
-		*/
 		{
 			QSet<int> correct_codes;
 			for (int i = 0; i < checked_card.punchCount(); ++i) {
@@ -337,6 +343,7 @@ QVariantMap ReceiptsPlugin::receiptTablesData(int card_id)
 		tt.setValue("currentStandings", current_standings);
 		tt.setValue("competitorsFinished", competitors_finished);
 		tt.setValue("timeMs", checked_card.timeMs());
+		tt.setValue("isCardLent", is_card_lent);
 
 		qfDebug() << "card:\n" << tt.toString();
 		ret["card"] = tt.toVariant();
@@ -364,14 +371,14 @@ void ReceiptsPlugin::previewCard(int card_id)
 void ReceiptsPlugin::previewReceipt(int card_id)
 {
 	//QMetaObject::invokeMethod(this, "previewReceipeClassic", Qt::DirectConnection, Q_ARG(QVariant, card_id));
-	previewReceipt_classic(card_id);
+	previewReceipt(card_id, currentReceiptPath());
 }
 
 bool ReceiptsPlugin::printReceipt(int card_id)
 {
 	QF_TIME_SCOPE("ReceiptsPlugin::printReceipt()");
 	try {
-		printReceipt_classic(card_id);
+		printReceipt(card_id, currentReceiptPath());
 		return true;
 	}
 	catch(const qf::core::Exception &e) {
@@ -395,14 +402,14 @@ bool ReceiptsPlugin::printCard(int card_id)
 	return false;
 }
 
-void ReceiptsPlugin::previewReceipt_classic(int card_id)
+void ReceiptsPlugin::previewReceipt(int card_id, const QString &receipt_path)
 {
 	qfLogFuncFrame() << "card id:" << card_id;
 	//qfInfo() << "previewReceipe_classic, card id:" << card_id;
 	auto *w = new qf::qmlwidgets::reports::ReportViewWidget();
 	w->setPersistentSettingsId("cardPreview");
 	w->setWindowTitle(tr("Receipt"));
-	w->setReport(manifest()->homeDir() + "/reports/receiptClassic.qml");
+	w->setReport(receipt_path);
 	QVariantMap dt = receiptTablesData(card_id);
 	for(auto key : dt.keys())
 		w->setTableData(key, dt.value(key));
@@ -412,11 +419,11 @@ void ReceiptsPlugin::previewReceipt_classic(int card_id)
 	dlg.exec();
 }
 
-void ReceiptsPlugin::printReceipt_classic(int card_id)
+void ReceiptsPlugin::printReceipt(int card_id, const QString &receipt_path)
 {
 	qfLogFuncFrame() << "card id:" << card_id;
 	QVariantMap dt = receiptTablesData(card_id);
-	receiptsPrinter()->printReceipt(manifest()->homeDir() + "/reports/receiptClassic.qml", dt);
+	receiptsPrinter()->printReceipt(receipt_path, dt);
 }
 
 }

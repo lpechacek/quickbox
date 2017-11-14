@@ -3,7 +3,8 @@
 #include "loggerwidget.h"
 #include "tablemodellogdevice.h"
 
-#include <qf/qmlwidgets/framework/centralwidget.h>
+#include <qf/qmlwidgets/framework/stackedcentralwidget.h>
+#include <qf/qmlwidgets/framework/partswitch.h>
 #include <qf/qmlwidgets/framework/dockwidget.h>
 #include <qf/qmlwidgets/menubar.h>
 #include <qf/qmlwidgets/action.h>
@@ -23,9 +24,9 @@ MainWindow::~MainWindow()
 {
 }
 
-QString MainWindow::versionString()
+QString MainWindow::versionString() const
 {
-	static QString s = QLatin1String("1.1.0");
+	static QString s = QLatin1String("1.1.12");
 	return s;
 }
 
@@ -52,7 +53,11 @@ void MainWindow::onPluginsLoaded()
 		menuBar()->actionForPath("view")->addActionInto(a);
 	}
 
+	auto *w = qobject_cast<qf::qmlwidgets::framework::StackedCentralWidget*>(centralWidget());
+	menuBar()->actionForPath("view/toolbar")->addActionInto(w->partSwitch()->toggleViewAction());
+
 	centralWidget()->setActivePart("Competitors", true);
 	setPersistentSettingsId("MainWindow");
 	loadPersistentSettings();
 }
+

@@ -62,6 +62,8 @@ public:
 	int currentStageId();
 	Q_SIGNAL void currentStageIdChanged(int current_stage);
 
+	Q_INVOKABLE int stageIdForRun(int run_id);
+
 	Q_INVOKABLE int stageStartMsec(int stage_id);
 	Q_INVOKABLE QDate stageStartDate(int stage_id);
 	Q_INVOKABLE QTime stageStartTime(int stage_id);
@@ -69,6 +71,7 @@ public:
 	//Q_INVOKABLE int currentStageStartMsec();
 
 	//Q_INVOKABLE QVariantMap stageDataMap(int stage_id) {return stageData(stage_id);}
+	void setStageData(int stage_id, const QString &key, const QVariant &value);
 	StageData stageData(int stage_id);
 	Q_SLOT void clearStageDataCache();
 

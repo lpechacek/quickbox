@@ -40,6 +40,7 @@ public:
 
 	int currentStageId();
 	int findRunId(int si_id);
+	bool isCardLent(int si_id, int run_id = 0);
 	ReadCard readCard(int card_id);
 	CheckedCard checkCard(int card_id, int run_id = 0);
 	CheckedCard checkCard(const ReadCard &read_card);
@@ -51,6 +52,8 @@ public:
 	bool saveCardAssignedRunnerIdSql(int card_id, int run_id);
 
 	Q_INVOKABLE bool reloadTimesFromCard(int card_id, int run_id = 0);
+
+	static int resolveAltCode(int maybe_alt_code, int stage_id);
 private:
 	void onInstalled();
 	QQmlListProperty<CardChecker> cardCheckersListProperty();

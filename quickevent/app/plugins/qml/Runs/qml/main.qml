@@ -81,7 +81,8 @@ RunsPlugin {
 			onTriggered: {
 				var default_file_name = "startlist-iof3.xml";
 				var file_name = InputDialogSingleton.getSaveFileName(null, qsTr("Get file name"), default_file_name, qsTr("XML files (*.xml)"));
-				startLists.exportStartListIofXml3(file_name)
+				if(file_name)
+					startLists.exportStartListIofXml3(file_name)
 			}
 		},
 		Action {
@@ -147,8 +148,9 @@ RunsPlugin {
 		a = a_print.addMenuInto("results", "&Results");
 		a.addActionInto(act_print_results_currentStage);
 		a.addActionInto(act_print_results_currentStageFirstN);
+		a.addSeparatorInto("results_awards_separator");
 		a.addActionInto(act_print_results_currentStageAwards);
-		a.addSeparatorInto();
+		a.addSeparatorInto("results_nstages_separator");
 		a.addActionInto(act_print_results_nStages);
 		a.addActionInto(act_print_results_NStageAwards);
 
@@ -166,6 +168,8 @@ RunsPlugin {
 
 		var m_results = a_export.addMenuInto("results", "&Results");
 		m_results.addActionInto(act_export_results_iofxml);
+
+		//Log.warning("onNativeInstalled");
 
 	}
 }

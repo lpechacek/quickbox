@@ -10,6 +10,7 @@
 #include <qf/core/assert.h>
 
 #include <QSettings>
+#include <QShowEvent>
 #include <QTimer>
 
 namespace Runs {
@@ -21,17 +22,28 @@ static Event::EventPlugin* eventPlugin()
 	QF_ASSERT_EX(plugin != nullptr, "Bad Event plugin!");
 	return qobject_cast<Event::EventPlugin*>(plugin);
 }
-
+namespace {
+auto persistent_settings_path_prefix = QStringLiteral("ui/MainWindow/");
+auto default_persistent_settings_id =  QStringLiteral("reportOptionsDialog");
+}
 ReportOptionsDialog::ReportOptionsDialog(QWidget *parent)
 	: QDialog(parent)
 	, qf::qmlwidgets::framework::IPersistentSettings(this)
 	, ui(new Ui::ReportOptionsDialog)
 {
 	ui->setupUi(this);
+	setPersistentSettingsId(default_persistent_settings_id);
 
 	//ui->edFilter->setText("h1%");
 	ui->grpStartOptions->setVisible(false);
 	ui->btRegExp->setEnabled(eventPlugin()->sqlDriverName().endsWith(QLatin1String("PSQL"), Qt::CaseInsensitive));
+
+	connect(ui->btSaveAsDefault, &QPushButton::clicked, [this]() {
+		savePersistentSettings();
+	});
+	connect(this, &ReportOptionsDialog::persistentSettingsIdChanged, [this]() {
+		loadPersistentSettings();
+	});
 
 	connect(this, &ReportOptionsDialog::startListOptionsVisibleChanged, ui->grpStartOptions, &QGroupBox::setVisible);
 }
@@ -39,6 +51,19 @@ ReportOptionsDialog::ReportOptionsDialog(QWidget *parent)
 ReportOptionsDialog::~ReportOptionsDialog()
 {
 	delete ui;
+}
+
+QString ReportOptionsDialog::persistentSettingsPath()
+{
+	return persistent_settings_path_prefix + persistentSettingsId();
+}
+
+bool ReportOptionsDialog::setPersistentSettingsId(const QString &id)
+{
+	bool ret = qf::qmlwidgets::framework::IPersistentSettings::setPersistentSettingsId(id);
+	if(ret)
+		emit persistentSettingsIdChanged(id);
+	return ret;
 }
 
 void ReportOptionsDialog::setClassNamesFilter(const QStringList &class_names)
@@ -66,26 +91,33 @@ bool ReportOptionsDialog::isStartListPrintStartNumbers() const
 
 QString ReportOptionsDialog::sqlWhereExpression() const
 {
-	if(ui->grpClassFilter->isChecked()) {
-		QString filter_str = ui->edFilter->text();
+	const Options opts = options();
+	return sqlWhereExpression(opts);
+}
+
+QString ReportOptionsDialog::sqlWhereExpression(const ReportOptionsDialog::Options &opts)
+{
+	if(opts.isUseClassFilter()) {
+		QString filter_str = opts.classFilter();
 		if(!filter_str.isEmpty()) {
-			if(ui->btRegExp->isChecked()) {
-				QString filter_operator = ui->chkClassFilterDoesntMatch->isChecked()? "!~*": "~*";
+			FilterType filter_type = (FilterType)opts.classFilterType();
+			if(filter_type == FilterType::RegExp) {
+				QString filter_operator = opts.isInvertClassFilter()? "!~*": "~*";
 				QString ret = "classes.name %1 '%2'";
 				ret = ret.arg(filter_operator).arg(filter_str);
 				return ret;
 			}
-			else if(ui->btWildCard->isChecked()) {
+			else if(filter_type == FilterType::WildCard) {
 				filter_str.replace('*', '%').replace('?', '_');
-				QString filter_operator = ui->chkClassFilterDoesntMatch->isChecked()? "NOT LIKE": "LIKE";
+				QString filter_operator = opts.isInvertClassFilter()? "NOT LIKE": "LIKE";
 				QString ret = "classes.name %1 '%2'";
 				ret = ret.arg(filter_operator).arg(filter_str);
 				return ret;
 			}
-			else if(ui->btClassNames->isChecked()) {
+			else if(filter_type == FilterType::ClassName) {
 				qf::core::String s = filter_str;
 				QStringList sl = s.splitAndTrim(',');
-				QString filter_operator = ui->chkClassFilterDoesntMatch->isChecked()? "NOT IN": "IN";
+				QString filter_operator = opts.isInvertClassFilter()? "NOT IN": "IN";
 				QString ret = "classes.name %1('%2')";
 				ret = ret.arg(filter_operator).arg(sl.join("','"));
 				return ret;
@@ -95,52 +127,88 @@ QString ReportOptionsDialog::sqlWhereExpression() const
 	return QString();
 }
 
+void ReportOptionsDialog::showEvent(QShowEvent *event)
+{
+	Super::showEvent(event);
+	if(event->spontaneous())
+		return;
+	ui->grpClassFilter->setVisible(isClassFilterVisible());
+}
+/*
 int ReportOptionsDialog::exec()
 {
 	loadPersistentSettings();
-	QTimer::singleShot(0, [this]() {
-		ui->grpClassFilter->setVisible(isClassFilterVisible());
-	});
 	int result = Super::exec();
-	if(result == QDialog::Accepted)
-		savePersistentSettings();
 	return result;
 }
 
-void ReportOptionsDialog::loadPersistentSettings()
+int ReportOptionsDialog::exec(const ReportOptionsDialog::Options &options)
 {
-	if(persistentSettingsId().isEmpty())
-		return;
-	QSettings settings;
-	QVariantMap m = settings.value(persistentSettingsPath()).toMap();
-	Options opts(m);
-	ui->cbxBreakAfterClassType->setCurrentIndex(opts.breakType());
-	ui->grpClassFilter->setChecked(opts.isUseClassFilter());
-	ui->chkClassFilterDoesntMatch->setChecked(opts.isInvertClassFilter());
-	ui->edFilter->setText(opts.classFilter());
-	FilterType filter_type = (FilterType)opts.classFilterType();
+	int result = Super::exec();
+	return result;
+}
+*/
+void ReportOptionsDialog::setOptions(const ReportOptionsDialog::Options &options)
+{
+	qfLogFuncFrame() << options;
+	ui->cbxBreakAfterClassType->setCurrentIndex(options.breakType());
+	ui->grpClassFilter->setChecked(options.isUseClassFilter());
+	ui->chkClassFilterDoesntMatch->setChecked(options.isInvertClassFilter());
+	ui->edFilter->setText(options.classFilter());
+	FilterType filter_type = (FilterType)options.classFilterType();
 	ui->btWildCard->setChecked(filter_type == FilterType::WildCard);
 	ui->btRegExp->setChecked(filter_type == FilterType::RegExp);
 	ui->btClassNames->setChecked(filter_type == FilterType::ClassName);
-	ui->chkStartOpts_PrintVacants->setChecked(opts.isStartListPrintVacants());
-	ui->chkStartOpts_PrintStartNumbers->setChecked(opts.isStartListPrintStartNumbers());
+	ui->chkStartOpts_PrintVacants->setChecked(options.isStartListPrintVacants());
+	ui->chkStartOpts_PrintStartNumbers->setChecked(options.isStartListPrintStartNumbers());
 }
 
-void ReportOptionsDialog::savePersistentSettings()
+ReportOptionsDialog::Options ReportOptionsDialog::options() const
 {
-	if(persistentSettingsId().isEmpty())
-		return;
-
 	Options opts;
 	opts.setBreakType(ui->cbxBreakAfterClassType->currentIndex());
-	opts.setUseClassFilter(ui->grpClassFilter);
+	opts.setUseClassFilter(ui->grpClassFilter->isChecked());
 	opts.setInvertClassFilter(ui->chkClassFilterDoesntMatch->isChecked());
 	opts.setClassFilter(ui->edFilter->text());
 	FilterType filter_type =  ui->btWildCard->isChecked()? FilterType::WildCard: ui->btRegExp->isChecked()? FilterType::RegExp: FilterType::ClassName;
 	opts.setClassFilterType((int)filter_type);
 	opts.setStartListPrintVacants(isStartListPrintVacants());
 	opts.setStartListPrintStartNumbers(isStartListPrintStartNumbers());
+	return opts;
+}
 
+ReportOptionsDialog::Options ReportOptionsDialog::savedOptions(const QString &persistent_settings_id)
+{
+	QSettings settings;
+	QString id = persistent_settings_id;
+	if(id.isEmpty())
+		id = default_persistent_settings_id;
+	QVariantMap m = settings.value(persistent_settings_path_prefix + id).toMap();
+	//qfInfo() << persistentSettingsPath() << m;
+	return Options(m);
+}
+
+void ReportOptionsDialog::loadPersistentSettings()
+{
+	qfLogFuncFrame() << persistentSettingsPath();
+	if(persistentSettingsId().isEmpty())
+		return;
+	QSettings settings;
+	QVariantMap m = settings.value(persistentSettingsPath()).toMap();
+	//qfInfo() << persistentSettingsPath() << m;
+	Options opts(m);
+	qfDebug() << opts;
+	setOptions(opts);
+}
+
+void ReportOptionsDialog::savePersistentSettings()
+{
+	qfLogFuncFrame() << persistentSettingsPath();
+	if(persistentSettingsId().isEmpty())
+		return;
+
+	Options opts = options();
+	qfDebug() << opts;
 	QSettings settings;
 	settings.setValue(persistentSettingsPath(), opts);
 }

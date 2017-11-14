@@ -1,6 +1,7 @@
 #include "speakerwidget.h"
 #include "ui_speakerwidget.h"
 
+#include "codeclassresultswidget.h"
 #include "thispartwidget.h"
 
 #include "Speaker/speakerplugin.h"
@@ -22,6 +23,7 @@
 #include <qf/core/sql/querybuilder.h>
 #include <qf/core/assert.h>
 
+#include <QDockWidget>
 #include <QJsonObject>
 #include <QLabel>
 #include <QSettings>
@@ -51,6 +53,16 @@ SpeakerWidget::SpeakerWidget(QWidget *parent) :
 	ui->tblPunches->setReadOnly(true);
 	ui->tblPunches->setCloneRowEnabled(false);
 	ui->tblPunches->setPersistentSettingsId("tblPunches");
+
+	connect(ui->tblPunches, &PunchesTableView::codeClassActivated, this, &SpeakerWidget::onCodeClassActivated);
+	/*
+	ui->tblPunches->setDragEnabled(true);
+	//ui->tblView->setDragDropMode(QAbstractItemView::DragOnly);
+	ui->tblPunches->setDragDropMode(QAbstractItemView::InternalMove);
+	ui->tblPunches->setSelectionMode(QAbstractItemView::SingleSelection);
+	ui->tblPunches->viewport()->setAcceptDrops(true);
+	ui->tblPunches->setDropIndicatorShown(true);
+	*/
 	//ui->tblPunches->setRowEditorMode(qfw::TableView::EditRowsMixed);
 	//ui->tblPunches->setInlineEditSaveStrategy(qfw::TableView::OnEditedValueCommit);
 	quickevent::og::SqlTableModel *m = new quickevent::og::SqlTableModel(this);
@@ -120,7 +132,7 @@ void SpeakerWidget::onDbEventNotify(const QString &domain, int connection_id, co
 		int siid = punch.siid();
 		if(siid > 0 && punch.marking() == quickevent::si::PunchRecord::MARKING_RACE) {
 			updateTableView(punch.id());
-			ui->gridWidget->onPunchReceived(punch);
+			emit punchReceived(punch);
 		}
 	}
 }
@@ -132,19 +144,11 @@ void SpeakerWidget::reset()
 		m_punchesModel->clearRows();
 		return;
 	}
+	ui->classResults->reset(0, 0, CodeClassResultsWidget::RESULTS_PUNCH_CODE);
 	if(isPartActive())
 		reload();
 	else
 		m_resetRequest = true;
-	/*
-	{
-		m_cbxClasses->blockSignals(true);
-		m_cbxClasses->loadItems(true);
-		m_cbxClasses->insertItem(0, tr("--- all ---"), 0);
-		connect(m_cbxClasses, SIGNAL(currentDataChanged(QVariant)), this, SLOT(reload()), Qt::UniqueConnection);
-		m_cbxClasses->blockSignals(false);
-	}
-	*/
 }
 
 void SpeakerWidget::reload()
@@ -160,7 +164,7 @@ void SpeakerWidget::reload()
 	int stage_id = eventPlugin()->currentStageId();
 	qfs::QueryBuilder qb;
 	qb.select2("punches", "*")
-			.select2("classes", "name")
+			.select2("classes", "id, name")
 			.select2("competitors", "registration")
 			.select("COALESCE(competitors.lastName, '') || ' ' || COALESCE(competitors.firstName, '') AS competitorName")
 			.from("punches")
@@ -190,19 +194,10 @@ void SpeakerWidget::updateTableView(int punch_id)
 
 void SpeakerWidget::loadSettings()
 {
-	if(m_settingsLoaded)
-		return;
-	m_settingsLoaded = true;
-	QSettings settings;
-	QString json = settings.value("plugins/speaker/grid").toString();
-	ui->gridWidget->loadLayout(json.toUtf8());
 }
 
 void SpeakerWidget::saveSettings()
 {
-	QSettings settings;
-	QByteArray ba = ui->gridWidget->saveLayout();
-	settings.setValue("plugins/speaker/grid", QString::fromUtf8(ba));
 }
 
 bool SpeakerWidget::isPartActive()
@@ -210,22 +205,22 @@ bool SpeakerWidget::isPartActive()
 	return m_partWidget && m_partWidget->isActive();
 }
 
-void SpeakerWidget::on_btInsertColumn_clicked()
+void SpeakerWidget::onCodeClassActivated(int class_id, int code)
 {
-	ui->gridWidget->addColumn();
+	CodeClassResultsWidget *w = new CodeClassResultsWidget(this);
+	w->reset(class_id, code);
+	//if(eventPlugin()->isEventOpen())
+	//	w->loadSetup(QJsonObject());
+	connect(this, &SpeakerWidget::punchReceived, w, &CodeClassResultsWidget::onPunchReceived);
+
+	QDockWidget *dw = new QDockWidget();
+	static int dock_widget_no = 0;
+	dw->setObjectName("CodeClassResultsWidgetDockWidget_" + QString::number(++dock_widget_no));
+	dw->setAllowedAreas(Qt::AllDockWidgetAreas);
+	dw->setWidget(w);
+	//dw->show();
+	qf::qmlwidgets::framework::MainWindow *fwk = qf::qmlwidgets::framework::MainWindow::frameWork();
+	fwk->addDockWidget(Qt::LeftDockWidgetArea, dw);
+	dw->setFloating(true);
 }
 
-void SpeakerWidget::on_btInsertRow_clicked()
-{
-	ui->gridWidget->addRow();
-}
-
-void SpeakerWidget::on_btDeleteColumn_clicked()
-{
-	ui->gridWidget->removeColumn();
-}
-
-void SpeakerWidget::on_btDeleteRow_clicked()
-{
-	ui->gridWidget->removeRow();
-}
