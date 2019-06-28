@@ -26,7 +26,8 @@ RESOURCES += \
 
 OTHER_FILES += \
     qml/reports/receipts/Classic.qml \
-    qml/reports/receipts/LoteryTicket.qml \
+    qml/reports/receipts/ClassicLottery.qml \
+    qml/reports/receipts/private/LotteryTicket.qml \
     qml/reports/sicard.qml \
 
 TRANSLATIONS += \
