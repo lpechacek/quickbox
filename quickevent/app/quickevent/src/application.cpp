@@ -5,6 +5,7 @@
 
 #include <qf/core/log.h>
 
+#include <QtGlobal>
 #include <QNetworkProxy>
 #include <QProcessEnvironment>
 
@@ -39,14 +40,10 @@ Application::Application(int &argc, char **argv, AppCliOptions *cli_opts)
 			QNetworkProxy::setApplicationProxy(proxy);
 		}
 	}
-#ifdef Q_OS_UNIX
-	QString plugin_path = QCoreApplication::applicationDirPath() + "/../lib/qml/" + QCoreApplication::applicationName().toLower();
-#else
-	QString plugin_path = QCoreApplication::applicationDirPath() + "/qml/" + QCoreApplication::applicationName().toLower();
+    QString plugin_path = QCoreApplication::applicationDirPath() + QT_STRINGIFY(QE_PLUGINS_SEARCH_PATH);
 #ifdef Q_OS_WIN
 	qfInfo() << "Adding DLL search path:" << plugin_path;
 	SetDllDirectory(reinterpret_cast<LPCWSTR>(plugin_path.utf16()));
-#endif
 #endif
 	qf::qmlwidgets::reports::ReportProcessor::qmlEngineImportPaths().append(plugin_path);
 }

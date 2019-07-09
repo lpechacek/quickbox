@@ -12,6 +12,7 @@
 #include <qf/core/utils/settings.h>
 #include <qf/core/model/logtablemodel.h>
 
+#include <QtGlobal>
 #include <QtQml>
 #include <QLocale>
 
@@ -91,7 +92,7 @@ int main(int argc, char *argv[])
 		}
 		if(lc_name.isEmpty() || lc_name == QLatin1String("system"))
 			lc_name = QLocale::system().name();
-		QString app_translations_path = QCoreApplication::applicationDirPath() + "/translations";
+		QString app_translations_path = QCoreApplication::applicationDirPath() + QT_STRINGIFY(QE_TRANSLATIONS_INSTALL_PATH);
 		qfInfo() << "Loading translations for:" << lc_name;
 		{
 			QTranslator *qt_translator = new QTranslator(&app);
