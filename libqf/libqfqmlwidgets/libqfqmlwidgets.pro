@@ -47,3 +47,4 @@ TRANSLATIONS += \
     libqfqmlwidgets.pl_PL.ts \
     libqfqmlwidgets.nb_NO.ts \
 
+include($$shadowed(../../install_paths.pri))

@@ -30,7 +30,7 @@ void Player::playAlert(AlertKind kind)
 	case AlertKind::OperatorNotify: fn = QStringLiteral("operator-notify.wav"); break;
 	}
 	if(!fn.isEmpty()) {
-		fn = QCoreApplication::applicationDirPath() + "/quickevent-data/style/sound/" + fn;
+		fn = QCoreApplication::applicationDirPath() + "/" QT_STRINGIFY(QE_SOUND_FILE_INSTALL_PATH) "/" + fn;
 		playFile(fn);
 	}
 }

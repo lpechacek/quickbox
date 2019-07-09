@@ -37,9 +37,16 @@ LIBS +=      \
 	-lquickeventcore \
 	-lquickeventgui \
 
-unix: LIBS +=  \
-	-L../../../lib  \
+unix:   \
 	-Wl,-rpath,\'\$\$ORIGIN/../lib:\$\$ORIGIN/../lib/qml/quickevent\'  \
+include($$shadowed($$QF_PROJECT_TOP_SRCDIR/install_paths.pri))
+unix {
+	LIBS +=  -L../../../lib
+	REL_LIBS_PATH = $$relative_path($$LIBS_INSTALL_PATH, $$BINS_INSTALL_PATH)
+	REL_PLUGINS_PATH = $${REL_LIBS_PATH}/qml
+	QMAKE_LFLAGS += -Wl,-rpath,\'\$\$ORIGIN/$${REL_LIBS_PATH}:\$\$ORIGIN/$${REL_PLUGINS_PATH}\'
+}
+
 
 # exception backtrace support
 CONFIG(debug, debug|release): unix: QMAKE_LFLAGS += -rdynamic

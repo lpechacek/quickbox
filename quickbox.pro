@@ -9,6 +9,24 @@ include(utils.pri)
 TEMPLATE = subdirs
 CONFIG += ordered
 
+# install paths
+unix {
+    LIBS_INSTALL_PATH = /lib
+    PLUGINS_INSTALL_PATH = $$LIBS_INSTALL_PATH/qml
+    QML_PLUGINS_INSTALL_PATH = $$PLUGINS_INSTALL_PATH
+    BINS_INSTALL_PATH = /bin
+    TRANSLATIONS_INSTALL_PATH = $${BINS_INSTALL_PATH}/translations
+    SOUND_FILE_INSTALL_PATH = $${BINS_INSTALL_PATH}/quickevent-data/style/sound
+} else {
+    LIBS_INSTALL_PATH = /
+    PLUGINS_INSTALL_PATH = $$LIBS_INSTALL_PATH/qml
+    QML_PLUGINS_INSTALL_PATH = $$PLUGINS_INSTALL_PATH
+    BINS_INSTALL_PATH = /bin
+    TRANSLATIONS_INSTALL_PATH = $${BINS_INSTALL_PATH}/translations
+    SOUND_FILE_INSTALL_PATH = $${BINS_INSTALL_PATH}/quickevent-data/style/sound
+}
+include(generate_install_paths.pri)
+
 #message (config: $$CONFIG)
 
 SUBDIRS += \
