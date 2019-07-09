@@ -80,3 +80,9 @@ win32:CONFIG(debug, debug|release):CONFIG += console
 TRANSLATIONS += \
     $${TARGET}.cs_CZ.ts \
     $${TARGET}.nb_NO.ts \
+
+CONFIG += lrelease
+QM_FILES_INSTALL_PATH = $$TRANSLATIONS_INSTALL_PATH
+
+target.path=$$BINS_INSTALL_PATH
+INSTALLS += target

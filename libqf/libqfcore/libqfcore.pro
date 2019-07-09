@@ -37,3 +37,7 @@ TRANSLATIONS += \
 	libqfcore.cs_CZ.ts \
     libqfcore.pl_PL.ts \
     libqfcore.nb_NO.ts \
+
+include($$shadowed(../../install_paths.pri))
+target.path=$$LIBS_INSTALL_PATH
+INSTALLS += target

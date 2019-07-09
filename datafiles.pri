@@ -15,6 +15,10 @@ unix {
 			mkdir -p $$DEST_DATA_DIR \
 			&& rsync -r $$SRC_DATA_DIR/ $$DEST_DATA_DIR
 	}
+
+	datafiles_install.path = $$DATA_INSTALL_PATH
+	datafiles_install.files = $$SRC_DATA_DIR/*
+	INSTALLS += datafiles_install
 }
 win32 {
 	POST_TARGETDEPS += datafiles

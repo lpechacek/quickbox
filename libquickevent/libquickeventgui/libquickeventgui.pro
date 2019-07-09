@@ -32,3 +32,7 @@ RESOURCES += libquickeventgui.qrc
 TRANSLATIONS += \
     libquickeventgui.cs_CZ.ts \
     libquickeventgui.nb_NO.ts \
+
+include($$shadowed(../../install_paths.pri))
+target.path=$$LIBS_INSTALL_PATH
+INSTALLS += target

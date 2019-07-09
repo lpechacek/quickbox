@@ -17,5 +17,6 @@ LIBS += -L$$DESTDIR -lqfcore
 
 include(libsiut.pri)
 
-
-
+include($$shadowed(../install_paths.pri))
+target.path=$$LIBS_INSTALL_PATH
+INSTALLS += target

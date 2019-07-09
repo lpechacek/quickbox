@@ -64,3 +64,6 @@ contains(ANDROID_TARGET_ARCH,armeabi-v7a) {
 }
 }
 
+include($$shadowed(../install_paths.pri))
+target.path=$$BINS_INSTALL_PATH
+INSTALLS += target

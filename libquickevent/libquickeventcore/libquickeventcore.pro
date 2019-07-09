@@ -30,3 +30,7 @@ RESOURCES += libquickeventcore.qrc
 TRANSLATIONS += \
     libquickeventcore.cs_CZ.ts \
     libquickeventcore.nb_NO.ts \
+
+include($$shadowed(../../install_paths.pri))
+target.path=$$LIBS_INSTALL_PATH
+INSTALLS += target

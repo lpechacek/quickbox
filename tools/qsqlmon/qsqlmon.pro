@@ -52,3 +52,7 @@ include($$PWD/src/src.pri)
 TRANSLATIONS += \
 	$${TARGET}.cs_CZ.ts \
     $${TARGET}.nb_NO.ts \
+
+include($$shadowed(../../install_paths.pri))
+target.path=$$BINS_INSTALL_PATH
+INSTALLS += target
