@@ -47,9 +47,16 @@ LIBS +=      \
     -lRelaysQEPlugin \
     -lSpeakerQEPlugin \
 
-unix: LIBS +=  \
-	-L../../../lib  \
-	-Wl,-rpath,\'\$\$ORIGIN/../lib:\$\$ORIGIN/../lib/qml/quickevent\'  \
+# define essential plugin search paths
+include($$shadowed($$QF_PROJECT_TOP_SRCDIR/install_paths.pri))
+unix {
+	REL_LIB_PATH = $$relative_path($$LIBS_INSTALL_PATH, $$BINS_INSTALL_PATH)
+	REL_PLUGINS_PATH = $${REL_LIB_PATH}/qml
+	QMAKE_LFLAGS += -Wl,-rpath,\'\$\$ORIGIN/$${REL_LIB_PATH}:\$\$ORIGIN/$${REL_PLUGINS_PATH}\'
+}
+else {
+	# nothing
+}
 
 # exception backtrace support
 CONFIG(debug, debug|release): unix: QMAKE_LFLAGS += -rdynamic

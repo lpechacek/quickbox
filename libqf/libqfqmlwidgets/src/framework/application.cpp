@@ -4,6 +4,7 @@
 #include <qf/core/assert.h>
 #include <qf/core/utils/fileutils.h>
 
+#include <QtGlobal>
 #include <QQmlEngine>
 #include <QQmlContext>
 #include <QFile>
@@ -24,20 +25,13 @@ Application::Application(int &argc, char **argv) :
 	}
 	{
 		QString path;
-	#ifdef Q_OS_UNIX
-		path = QCoreApplication::applicationDirPath() + "/../lib/qml";
-	#else
-		path = QCoreApplication::applicationDirPath() + "/qml";
-	#endif
+		path = QCoreApplication::applicationDirPath() + "/" + QT_STRINGIFY(QE_PLUGINS_INSTALL_PATH);
 		m_qmlLibraryImportPaths << path;
 	}
 	{
 		QString path;
-#ifdef Q_OS_UNIX
-		path = QCoreApplication::applicationDirPath() + "/../lib/qml/" + QCoreApplication::applicationName().toLower();
-#else
-		path = QCoreApplication::applicationDirPath() + "/qml/" + QCoreApplication::applicationName().toLower();
-#endif
+		path = QCoreApplication::applicationDirPath() + "/" + QT_STRINGIFY(QE_QML_PLUGINS_INSTALL_PATH)
+			+ "/" + QCoreApplication::applicationName().toLower();
 		m_qmlPluginImportPaths << path;
 	}
 	//loadStyleSheet();
@@ -193,7 +187,8 @@ void Application::loadStyleSheet(const QString &file)
 	QString css_file_name = file;
 	if(css_file_name.isEmpty()) {
 		QString app_name = Application::applicationName().toLower();
-		css_file_name = qfu::FileUtils::joinPath(Application::applicationDirPath(), "/" + app_name + "-data/style/default.css");
+		css_file_name = qfu::FileUtils::joinPath(Application::applicationDirPath(),
+                                                 QString("/") + QT_STRINGIFY(QE_NOARCH_DATA_INSTALL_PATH) + "/style/default.css");
 		if(!QFile::exists(css_file_name))
 			css_file_name = ":/" + app_name + "/style/default.css";
 	}

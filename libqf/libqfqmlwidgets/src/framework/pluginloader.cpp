@@ -207,7 +207,7 @@ void PluginLoader::loadPluginTranslations(const QString &feature_id)
 	QString lc_name = mainWindow()->uiLanguageName();
 	if(!lc_name.isEmpty()) {
 		QString tr_name = feature_id + '-' + lc_name;
-		QString app_translations_path = QCoreApplication::applicationDirPath() + "/translations";
+		QString app_translations_path = QCoreApplication::applicationDirPath() + '/' + QT_STRINGIFY(QE_TRANSLATIONS_INSTALL_PATH);
 		QTranslator *trans = new QTranslator(mainWindow());
 		bool ok = trans->load(tr_name, app_translations_path);
 		if(ok) {
