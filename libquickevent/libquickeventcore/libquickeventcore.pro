@@ -33,3 +33,9 @@ TRANSLATIONS += \
 	libquickeventcore-nb_NO.ts \
 	libquickeventcore-ru_RU.ts \
 	libquickeventcore-nl_BE.ts \
+
+include($$shadowed(../../install_paths.pri))
+CONFIG += lrelease
+QM_FILES_INSTALL_PATH = $$TRANSLATIONS_INSTALL_PATH
+target.path=$$LIBS_INSTALL_PATH
+INSTALLS += target

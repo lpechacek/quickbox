@@ -42,3 +42,7 @@ include ($$PWD/src/src.pri)
 OTHER_FILES += \
     divers/qsicli/extensions/qml/init.qml \
     divers/qsicli/extensions/qml/sievent/CardReadOut.qml
+
+include($$shadowed(../install_paths.pri))
+target.path=$$BINS_INSTALL_PATH
+INSTALLS += target

@@ -53,3 +53,9 @@ TRANSLATIONS += \
 	$${TARGET}-nb_NO.ts \
 	$${TARGET}-ru_RU.ts \
 	$${TARGET}-nl_BE.ts \
+
+include($$shadowed(../../install_paths.pri))
+CONFIG += lrelease
+QM_FILES_INSTALL_PATH = $$TRANSLATIONS_INSTALL_PATH
+target.path=$$BINS_INSTALL_PATH
+INSTALLS += target

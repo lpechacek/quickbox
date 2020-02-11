@@ -44,3 +44,6 @@ win32: CONFIG += console
 
 include ($$PWD/src/src.pri)
 
+include($$shadowed(../install_paths.pri))
+target.path=$$BINS_INSTALL_PATH
+INSTALLS += target

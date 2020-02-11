@@ -1,6 +1,8 @@
+include($$shadowed(install_paths.pri))
 SRC_DATA_DIR_NAME = datafiles
 SRC_DATA_DIR = $$PROJECT_TOP_SRCDIR/$$SRC_DATA_DIR_NAME
 DEST_DATA_DIR_NAME = $${TARGET}-data
 DEST_DATA_DIR = $$DESTDIR/$$DEST_DATA_DIR_NAME
+DATA_INSTALL_PATH = $$NOARCH_DATA_INSTALL_PATH
 
 include ($$PWD/datafiles.pri)

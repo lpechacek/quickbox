@@ -48,3 +48,9 @@ TRANSLATIONS += \
 	libqfqmlwidgets-nb_NO.ts \
 	libqfqmlwidgets-ru_RU.ts \
 	libqfqmlwidgets-nl_BE.ts \
+
+include($$shadowed(../../install_paths.pri))
+CONFIG += lrelease
+QM_FILES_INSTALL_PATH = $$TRANSLATIONS_INSTALL_PATH
+target.path=$$LIBS_INSTALL_PATH
+INSTALLS += target

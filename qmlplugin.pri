@@ -27,3 +27,6 @@ message( QML_IMPORT_PATH: $$QML_IMPORT_PATH )
 message( DESTDIR: $$DESTDIR )
 message( TARGET: $$TARGET )
 
+include($$shadowed($$QF_PROJECT_TOP_SRCDIR/install_paths.pri))
+target.path=$$PLUGINS_INSTALL_PATH
+INSTALLS += target

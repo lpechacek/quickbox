@@ -35,3 +35,9 @@ TRANSLATIONS += \
 	libquickeventgui-nb_NO.ts \
 	libquickeventgui-ru_RU.ts \
 	libquickeventgui-nl_BE.ts \
+
+include($$shadowed(../../install_paths.pri))
+CONFIG += lrelease
+QM_FILES_INSTALL_PATH = $$TRANSLATIONS_INSTALL_PATH
+target.path=$$LIBS_INSTALL_PATH
+INSTALLS += target

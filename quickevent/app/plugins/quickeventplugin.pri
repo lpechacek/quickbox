@@ -40,7 +40,13 @@ LIBS += \
 	-lquickeventcore \
 	-lquickeventgui \
 
+include($$shadowed($$QF_PROJECT_TOP_SRCDIR/install_paths.pri))
 SRC_DATA_DIR = $$PLUGIN_TOP_SRCDIR/qml
 DEST_DATA_DIR = $$DESTDIR/qml/quickevent/$$PLUGIN_NAME
 include ( $$QF_PROJECT_TOP_SRCDIR/datafiles.pri )
 
+CONFIG += lrelease
+QM_FILES_INSTALL_PATH = $$TRANSLATIONS_INSTALL_PATH
+
+target.path=$$PLUGINS_INSTALL_PATH
+INSTALLS += target
