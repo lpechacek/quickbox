@@ -95,7 +95,7 @@ if [[ $O_COMMAND == "import-ts" ]]; then
 		dest_path=$O_SRC_DIR/$fpath
 		#echo "fname: $fname"
 		#echo "dest_path: $dest_path"
-		tsnames=$O_ARGS/${fname}.${O_LOCALE}.ts
+		tsnames=$O_ARGS/${fname}-${O_LOCALE}.ts
 		for tsname in $tsnames; do
 			echo "copy: $tsname to $dest_path"
 			cp $tsname $dest_path/
@@ -117,7 +117,7 @@ if [[ $O_COMMAND == "export-ts" ]]; then
 		fpath=${paths[$fname]}
 		src_path=$O_SRC_DIR/$fpath
 		echo "copy tsfiles from: $src_path to $out_dir"
-		cp $src_path/${fname}.${O_LOCALE}.ts $out_dir/
+		cp $src_path/${fname}-${O_LOCALE}.ts $out_dir/
 	done
 	exit 0
 fi

@@ -28,8 +28,8 @@ include ( src/src.pri )
 RESOURCES += libquickeventcore.qrc
 
 TRANSLATIONS += \
-	libquickeventcore.cs_CZ.ts \
-	libquickeventcore.pl_PL.ts \
-	libquickeventcore.nb_NO.ts \
-	libquickeventcore.ru_RU.ts \
-	libquickeventcore.nl_BE.ts \
+	libquickeventcore-cs_CZ.ts \
+	libquickeventcore-pl_PL.ts \
+	libquickeventcore-nb_NO.ts \
+	libquickeventcore-ru_RU.ts \
+	libquickeventcore-nl_BE.ts \

@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
 		}
 		for(QString prefix : {"libqfcore", "libqfqmlwidgets", "libquickeventcore", "libquickeventgui", "libsiut", "quickevent"}) {
 			QTranslator *qt_translator = new QTranslator(&app);
-			QString tr_name = prefix + "." + lc_name;
+			QString tr_name = prefix + "-" + lc_name;
 			bool ok = qt_translator->load(tr_name, app_translations_path);
 			if(ok) {
 				ok = app.installTranslator(qt_translator);

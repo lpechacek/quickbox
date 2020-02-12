@@ -48,8 +48,8 @@ console: message(CONSOLE)
 include($$PWD/src/src.pri)
 
 TRANSLATIONS += \
-	$${TARGET}.cs_CZ.ts \
-	$${TARGET}.pl_PL.ts \
-	$${TARGET}.nb_NO.ts \
-	$${TARGET}.ru_RU.ts \
-	$${TARGET}.nl_BE.ts \
+	$${TARGET}-cs_CZ.ts \
+	$${TARGET}-pl_PL.ts \
+	$${TARGET}-nb_NO.ts \
+	$${TARGET}-ru_RU.ts \
+	$${TARGET}-nl_BE.ts \
